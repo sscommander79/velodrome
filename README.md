@@ -8,6 +8,10 @@ straight to an **Elektron Digitakt 2** over Web MIDI.
 This is a 100% browser-based React + Vite app. No server, no accounts, no data
 ever leaves your machine.
 
+**▶ Live demo: https://sscommander79.github.io/velodrome/** — open in **Chrome or
+Edge** (the Digitakt / Web MIDI features need a Chromium browser) and click
+*"load a sample ride"* to try it instantly.
+
 ## Requirements
 
 - **Node.js 20.11 or newer** (check with `node -v`)
