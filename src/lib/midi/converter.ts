@@ -42,10 +42,28 @@ export async function convertToMidi(
 
   const scaleNotes = buildScaleNotes(config.key, config.mode);
 
-  const minAlt = Math.min(...points.map((p) => p.altitude));
-  const maxAlt = Math.max(...points.map((p) => p.altitude));
-  const minHr = Math.min(...points.map((p) => p.heartRate));
-  const maxHr = Math.max(...points.map((p) => p.heartRate));
+  // Hoist per-field arrays out of the phrase loop below — rebuilding these
+  // inside the loop was O(phrases × points) allocations.
+  const cadences = points.map((p) => p.cadence);
+  const altitudes = points.map((p) => p.altitude);
+  const heartRates = points.map((p) => p.heartRate);
+  const powers = points.map((p) => p.power);
+
+  // Reduce instead of Math.min(...spread): the spread form throws
+  // "Maximum call stack size exceeded" on very long rides (tens of thousands
+  // of per-second points).
+  let minAlt = Infinity;
+  let maxAlt = -Infinity;
+  let minHr = Infinity;
+  let maxHr = -Infinity;
+  for (let k = 0; k < points.length; k++) {
+    const a = altitudes[k];
+    const h = heartRates[k];
+    if (a < minAlt) minAlt = a;
+    if (a > maxAlt) maxAlt = a;
+    if (h < minHr) minHr = h;
+    if (h > maxHr) maxHr = h;
+  }
 
   const midi = new Midi();
 
@@ -88,26 +106,10 @@ export async function convertToMidi(
     const pointsInPhrase = Math.max(1, Math.round(phraseDurationSec / secondsPerPoint));
     const phraseEnd = Math.min(i + pointsInPhrase, points.length);
 
-    const avgCadence = averageOf(
-      points.map((p) => p.cadence),
-      i,
-      phraseEnd
-    );
-    const avgAlt = averageOf(
-      points.map((p) => p.altitude),
-      i,
-      phraseEnd
-    );
-    const avgHr = averageOf(
-      points.map((p) => p.heartRate),
-      i,
-      phraseEnd
-    );
-    const avgPower = averageOf(
-      points.map((p) => p.power),
-      i,
-      phraseEnd
-    );
+    const avgCadence = averageOf(cadences, i, phraseEnd);
+    const avgAlt = averageOf(altitudes, i, phraseEnd);
+    const avgHr = averageOf(heartRates, i, phraseEnd);
+    const avgPower = averageOf(powers, i, phraseEnd);
 
     const smoothedCadence = Math.max(
       30,
