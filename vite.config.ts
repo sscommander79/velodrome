@@ -3,7 +3,10 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
-export default defineConfig({
+// base is '/velodrome/' for the production build (GitHub Pages serves the repo
+// at a subpath), but '/' for local dev so `npm run dev` works at the root.
+export default defineConfig(({ command }) => ({
+  base: command === "build" ? "/velodrome/" : "/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -20,4 +23,4 @@ export default defineConfig({
     host: true,
     open: true,
   },
-});
+}));
