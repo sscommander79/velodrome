@@ -3,10 +3,11 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
-// base is '/velodrome/' for the production build (GitHub Pages serves the repo
-// at a subpath), but '/' for local dev so `npm run dev` works at the root.
-export default defineConfig(({ command }) => ({
-  base: command === "build" ? "/velodrome/" : "/",
+// GitHub Pages serves the repo at a subpath (/velodrome/), so its build sets
+// GH_PAGES=1. Every other target — Vercel/Netlify/Cloudflare and local dev —
+// serves at the root, so base stays '/'.
+export default defineConfig(() => ({
+  base: process.env.GH_PAGES ? "/velodrome/" : "/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
