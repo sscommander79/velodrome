@@ -155,9 +155,9 @@ export function DigitaktPanel({ ride, config }: DigitaktPanelProps) {
                 <li className="flex gap-3">
                   <span className="text-primary font-mono shrink-0">01</span>
                   <span>
-                    Run a <span className="text-primary">USB-C cable</span> from the Digitakt 2 to
-                    your computer. USB MIDI is class-compliant — no driver needed. (A 5-pin{" "}
-                    <span className="text-primary">MIDI interface</span> works too.)
+                    Run the included <span className="text-primary">USB 2.0 A-to-B cable</span> from
+                    the Digitakt II to your computer — it's class-compliant, so no driver is needed.
+                    (A 5-pin <span className="text-primary">MIDI interface</span> works too.)
                   </span>
                 </li>
                 <li className="flex gap-3">
@@ -191,10 +191,12 @@ export function DigitaktPanel({ ride, config }: DigitaktPanelProps) {
                 <li className="flex gap-3">
                   <span className="text-primary font-mono shrink-0">04</span>
                   <span>
-                    <span className="text-primary">SETTINGS → MIDI CONFIG → CHANNELS</span>: note the
-                    channel of the track you want to drive (or the{" "}
-                    <span className="text-primary">AUTO channel</span>). Set the{" "}
-                    <span className="text-primary">MIDI Channel</span> control here to match.{" "}
+                    <span className="text-primary">SETTINGS → MIDI CONFIG → CHANNELS</span>: each
+                    audio track has its own channel under{" "}
+                    <span className="text-primary">TRACK 1–16</span> (or use{" "}
+                    <span className="text-primary">AUTO CHANNEL</span> to drive whichever track is
+                    active). Set the <span className="text-primary">MIDI Channel</span> control here
+                    to match.{" "}
                     <span className="text-muted-foreground/70">
                       Mismatch = the most common "it sent but nothing happened."
                     </span>
@@ -227,11 +229,11 @@ export function DigitaktPanel({ ride, config }: DigitaktPanelProps) {
                   <p>
                     Streams the notes in real time on the chosen channel at the chosen{" "}
                     <span className="text-primary">BPM</span>. To capture them into the DT2 sequencer,
-                    arm <span className="text-primary">Live Recording</span> first (
-                    <span className="text-primary">FUNC + REC</span>, or hold{" "}
-                    <span className="text-primary">REC</span> then press{" "}
-                    <span className="text-primary">PLAY</span> — check your manual) before starting
-                    playback. Without it, the notes just sound live and aren't recorded.
+                    arm <span className="text-primary">Live Recording</span> first — hold{" "}
+                    <span className="text-primary">[RECORD]</span> then press{" "}
+                    <span className="text-primary">[PLAY]</span> (the RECORD key flashes red) —
+                    before starting playback. Without it, the notes just sound live and aren't
+                    recorded.
                   </p>
                 </div>
               </div>
