@@ -8,6 +8,7 @@ import { ElevationChart } from "@/components/ElevationChart";
 import { ResultPanel } from "@/components/ResultPanel";
 import { Button } from "@/components/ui/button";
 import { SkullBackground } from "@/components/SkullBackground";
+import { GuideDialog } from "@/components/GuideDialog";
 import { buildSampleRide } from "@/lib/sampleRide";
 
 function SkullIcon({ className }: { className?: string }) {
@@ -91,17 +92,20 @@ export function Home() {
             VELODROME
           </span>
         </div>
-        {ride && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleReset}
-            data-testid="button-reset"
-            className="font-mono text-xs text-muted-foreground hover:text-primary"
-          >
-            [ RESET ]
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          <GuideDialog />
+          {ride && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleReset}
+              data-testid="button-reset"
+              className="font-mono text-xs text-muted-foreground hover:text-primary"
+            >
+              [ RESET ]
+            </Button>
+          )}
+        </div>
       </header>
 
       <main className="w-full max-w-5xl px-4 py-8 md:py-12 flex flex-col gap-12 flex-1">

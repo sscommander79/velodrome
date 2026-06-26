@@ -35,6 +35,7 @@ export function DigitaktPanel({ ride, config }: DigitaktPanelProps) {
   const [activeStep, setActiveStep] = useState<number | null>(null);
   const [steps, setSteps] = useState<StepData[]>([]);
   const [playHandle, setPlayHandle] = useState<PlaybackHandle | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
 
   const browserOk = isBrowserSupported();
 
@@ -132,6 +133,151 @@ export function DigitaktPanel({ ride, config }: DigitaktPanelProps) {
           Web MIDI requires Chrome or Edge. Firefox and Safari are not supported.
         </div>
       )}
+
+      {/* Hardware setup steps */}
+      <div className="border border-border/60">
+        <button
+          onClick={() => setShowSetup(v => !v)}
+          aria-expanded={showSetup}
+          data-testid="button-setup-toggle"
+          className="w-full flex items-center justify-between px-4 py-3 font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors"
+        >
+          <span>{showSetup ? "▾" : "▸"} Hardware setup steps</span>
+          <span className="text-primary/60">DT2</span>
+        </button>
+        {showSetup && (
+          <div className="px-4 pb-4 border-t border-border/60 pt-4 space-y-5 text-xs text-muted-foreground leading-relaxed">
+
+            {/* 1 — Connect */}
+            <section className="space-y-2">
+              <div className="font-mono uppercase tracking-widest text-primary/90">1 · Connect</div>
+              <ol className="space-y-2 pl-1">
+                <li className="flex gap-3">
+                  <span className="text-primary font-mono shrink-0">01</span>
+                  <span>
+                    Run a <span className="text-primary">USB-C cable</span> from the Digitakt 2 to
+                    your computer. USB MIDI is class-compliant — no driver needed. (A 5-pin{" "}
+                    <span className="text-primary">MIDI interface</span> works too.)
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="text-primary font-mono shrink-0">02</span>
+                  <span>
+                    In <span className="text-primary">Chrome or Edge</span>, click{" "}
+                    <span className="text-primary">Connect MIDI Device</span> below and{" "}
+                    <span className="text-primary">allow MIDI + SysEx</span> at the browser prompt.
+                    The DT2 should appear in the device dropdown as{" "}
+                    <span className="text-primary">Elektron Digitakt II</span>. If the list is empty,
+                    reseat the cable and click Connect again — it refreshes on every connect/disconnect.
+                  </span>
+                </li>
+              </ol>
+            </section>
+
+            {/* 2 — Configure the DT2 */}
+            <section className="space-y-2">
+              <div className="font-mono uppercase tracking-widest text-primary/90">2 · Configure the DT2</div>
+              <ol className="space-y-2 pl-1">
+                <li className="flex gap-3">
+                  <span className="text-primary font-mono shrink-0">03</span>
+                  <span>
+                    <span className="text-primary">SETTINGS → MIDI CONFIG → PORT CONFIG</span>: set{" "}
+                    <span className="text-primary">INPUT FROM</span> to{" "}
+                    <span className="text-primary">USB</span> (or MIDI+USB) so the DT2 listens to the
+                    browser. For Live Playback, also set{" "}
+                    <span className="text-primary">RECEIVE NOTES = ON</span>.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="text-primary font-mono shrink-0">04</span>
+                  <span>
+                    <span className="text-primary">SETTINGS → MIDI CONFIG → CHANNELS</span>: note the
+                    channel of the track you want to drive (or the{" "}
+                    <span className="text-primary">AUTO channel</span>). Set the{" "}
+                    <span className="text-primary">MIDI Channel</span> control here to match.{" "}
+                    <span className="text-muted-foreground/70">
+                      Mismatch = the most common "it sent but nothing happened."
+                    </span>
+                  </span>
+                </li>
+              </ol>
+            </section>
+
+            {/* 3 — Choose a mode */}
+            <section className="space-y-2">
+              <div className="font-mono uppercase tracking-widest text-primary/90">3 · Choose a mode</div>
+              <div className="space-y-3 pl-1">
+                <div className="border-l-2 border-primary/30 pl-3 space-y-1">
+                  <div className="font-mono text-primary">Write via SysEx</div>
+                  <p>
+                    Writes a whole pattern straight into a sequencer slot. Keep the DT2{" "}
+                    <span className="text-primary">stopped/idle</span>. The{" "}
+                    <span className="text-primary">Device ID</span> must match the DT2 (default{" "}
+                    <span className="text-primary">0x12 / 18</span>). After sending, open the target
+                    track's pattern to check the trigs.{" "}
+                    <span className="text-muted-foreground/70">
+                      This SysEx is reverse-engineered from the community-documented protocol (OS
+                      1.15A) — verify against your firmware. If a write doesn't show up, use Live
+                      Playback.
+                    </span>
+                  </p>
+                </div>
+                <div className="border-l-2 border-primary/30 pl-3 space-y-1">
+                  <div className="font-mono text-primary">Live Playback <span className="text-muted-foreground/70 normal-case">— most reliable</span></div>
+                  <p>
+                    Streams the notes in real time on the chosen channel at the chosen{" "}
+                    <span className="text-primary">BPM</span>. To capture them into the DT2 sequencer,
+                    arm <span className="text-primary">Live Recording</span> first (
+                    <span className="text-primary">FUNC + REC</span>, or hold{" "}
+                    <span className="text-primary">REC</span> then press{" "}
+                    <span className="text-primary">PLAY</span> — check your manual) before starting
+                    playback. Without it, the notes just sound live and aren't recorded.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* 4 — Send */}
+            <section className="space-y-2">
+              <div className="font-mono uppercase tracking-widest text-primary/90">4 · Send</div>
+              <p className="pl-1">
+                <span className="text-primary font-mono">05</span> &nbsp;Pick your output device from
+                the dropdown, then hit the send button below. Watch the{" "}
+                <span className="text-primary">step preview</span> light up as it plays.
+              </p>
+            </section>
+
+            {/* Troubleshooting */}
+            <section className="space-y-2 border-t border-border/40 pt-3">
+              <div className="font-mono uppercase tracking-widest text-muted-foreground/80">Troubleshooting</div>
+              <ul className="space-y-1.5 pl-1">
+                <li className="flex gap-2">
+                  <span className="text-primary">·</span>
+                  <span>
+                    <span className="text-foreground">No devices listed</span> — use a data USB cable
+                    (not charge-only), reseat it, click Connect again.
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-primary">·</span>
+                  <span>
+                    <span className="text-foreground">Sent but silent</span> — channel mismatch, or{" "}
+                    <span className="text-primary">RECEIVE NOTES</span> is off / INPUT FROM doesn't
+                    include USB.
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-primary">·</span>
+                  <span>
+                    <span className="text-foreground">SysEx "sent" but pattern empty</span> — switch
+                    to <span className="text-primary">Live Playback</span>.
+                  </span>
+                </li>
+              </ul>
+            </section>
+          </div>
+        )}
+      </div>
 
       {/* Step visualizer */}
       <div className="space-y-2">
