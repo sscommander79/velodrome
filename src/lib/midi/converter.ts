@@ -7,6 +7,7 @@ import {
   heartRateToVelocity,
 } from './scales';
 import { euclideanPattern } from './euclidean';
+import { selectHighlights } from './highlights';
 
 const PHRASE_BARS = 4;
 const BEATS_PER_BAR = 4;
@@ -208,20 +209,17 @@ export async function convertToMidi(
   };
 
   if (config.targetBars !== null) {
-    // Compressed: the whole ride squeezed into targetBars. Equal point
-    // slices, so each phrase covers the same share of the ride; BPM comes
-    // from the slice-average speed rather than one instantaneous reading.
+    // Compressed: the whole ride squeezed into targetBars. Interesting
+    // windows anchor the phrase sequence; BPM still comes from each
+    // window's average speed rather than one instantaneous reading.
     const numPhrases = Math.max(1, Math.round(config.targetBars / PHRASE_BARS));
+    const windows = selectHighlights(points, numPhrases);
     for (let phrase = 0; phrase < numPhrases; phrase++) {
       if (phrase % YIELD_EVERY === 0) {
         onProgress?.(phrase / numPhrases);
         await yieldToEventLoop();
       }
-      const start = Math.floor((phrase * points.length) / numPhrases);
-      const end =
-        phrase === numPhrases - 1
-          ? points.length
-          : Math.max(start + 1, Math.floor(((phrase + 1) * points.length) / numPhrases));
+      const { start, end } = windows[phrase];
       const bpm = speedToBpm(averageOf(speeds, start, end), config.tempoMin, config.tempoMax);
       emitPhrase(start, end, bpm, phrase);
     }
