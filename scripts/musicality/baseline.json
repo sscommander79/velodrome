@@ -64,35 +64,35 @@
         }
       },
       "conversion": {
-        "noteCount": 472,
-        "musicDurationMin": 2.7,
+        "noteCount": 488,
+        "musicDurationMin": 2.5,
         "bpmRange": [
-          83,
-          126
+          76,
+          145
         ]
       },
       "melody": {
-        "noteCount": 472,
-        "uniquePitches": 34,
-        "pitchEntropyBits": 4.424,
-        "topPitchDominance": 0.178,
-        "consecutiveRepeatRate": 0.248,
-        "fourGramRepeatRate": 0.471,
-        "intervalStatic": 0.248,
-        "intervalStep": 0.739,
-        "intervalLeap": 0.013,
-        "restRatio": 0.65,
-        "velocityStd": 0.117,
-        "ioiEntropyBits": 4.263,
-        "adjacentWindowSimilarity": 0.421,
+        "noteCount": 488,
+        "uniquePitches": 36,
+        "pitchEntropyBits": 4.904,
+        "topPitchDominance": 0.094,
+        "consecutiveRepeatRate": 0.337,
+        "fourGramRepeatRate": 0.41,
+        "intervalStatic": 0.337,
+        "intervalStep": 0.649,
+        "intervalLeap": 0.014,
+        "restRatio": 0.644,
+        "velocityStd": 0.15,
+        "ioiEntropyBits": 4.377,
+        "adjacentWindowSimilarity": 0.28,
         "inScaleRate": 1
       },
       "percussion": {
-        "noteCount": 835,
+        "noteCount": 875,
         "uniqueInstruments": 4,
-        "velocityStd": 0.117,
-        "ioiEntropyBits": 3.773,
-        "restRatio": 0.738
+        "velocityStd": 0.127,
+        "ioiEntropyBits": 4.146,
+        "restRatio": 0.709
       },
       "digitaktSteps": {
         "activeRatio": 0.5,
@@ -166,35 +166,35 @@
         }
       },
       "conversion": {
-        "noteCount": 472,
-        "musicDurationMin": 3,
+        "noteCount": 464,
+        "musicDurationMin": 2.9,
         "bpmRange": [
-          66,
-          111
+          75,
+          124
         ]
       },
       "melody": {
-        "noteCount": 472,
+        "noteCount": 464,
         "uniquePitches": 36,
-        "pitchEntropyBits": 4.614,
-        "topPitchDominance": 0.146,
-        "consecutiveRepeatRate": 0.321,
-        "fourGramRepeatRate": 0.424,
-        "intervalStatic": 0.321,
-        "intervalStep": 0.675,
-        "intervalLeap": 0.004,
-        "restRatio": 0.651,
-        "velocityStd": 0.109,
-        "ioiEntropyBits": 4.555,
-        "adjacentWindowSimilarity": 0.321,
+        "pitchEntropyBits": 4.797,
+        "topPitchDominance": 0.144,
+        "consecutiveRepeatRate": 0.382,
+        "fourGramRepeatRate": 0.423,
+        "intervalStatic": 0.382,
+        "intervalStep": 0.611,
+        "intervalLeap": 0.006,
+        "restRatio": 0.661,
+        "velocityStd": 0.102,
+        "ioiEntropyBits": 4.443,
+        "adjacentWindowSimilarity": 0.258,
         "inScaleRate": 1
       },
       "percussion": {
-        "noteCount": 852,
+        "noteCount": 844,
         "uniqueInstruments": 4,
-        "velocityStd": 0.124,
-        "ioiEntropyBits": 4.14,
-        "restRatio": 0.762
+        "velocityStd": 0.121,
+        "ioiEntropyBits": 3.824,
+        "restRatio": 0.756
       },
       "digitaktSteps": {
         "activeRatio": 0.438,
@@ -268,35 +268,35 @@
         }
       },
       "conversion": {
-        "noteCount": 512,
-        "musicDurationMin": 2,
+        "noteCount": 508,
+        "musicDurationMin": 2.1,
         "bpmRange": [
-          104,
-          146
+          90,
+          144
         ]
       },
       "melody": {
-        "noteCount": 512,
-        "uniquePitches": 36,
-        "pitchEntropyBits": 4.932,
-        "topPitchDominance": 0.064,
-        "consecutiveRepeatRate": 0.086,
-        "fourGramRepeatRate": 0.424,
-        "intervalStatic": 0.086,
-        "intervalStep": 0.894,
-        "intervalLeap": 0.02,
-        "restRatio": 0.616,
-        "velocityStd": 0.106,
-        "ioiEntropyBits": 3.233,
-        "adjacentWindowSimilarity": 0.417,
+        "noteCount": 508,
+        "uniquePitches": 32,
+        "pitchEntropyBits": 4.637,
+        "topPitchDominance": 0.077,
+        "consecutiveRepeatRate": 0.243,
+        "fourGramRepeatRate": 0.465,
+        "intervalStatic": 0.243,
+        "intervalStep": 0.748,
+        "intervalLeap": 0.01,
+        "restRatio": 0.617,
+        "velocityStd": 0.131,
+        "ioiEntropyBits": 3.769,
+        "adjacentWindowSimilarity": 0.294,
         "inScaleRate": 1
       },
       "percussion": {
-        "noteCount": 836,
+        "noteCount": 825,
         "uniqueInstruments": 4,
-        "velocityStd": 0.121,
-        "ioiEntropyBits": 3.529,
-        "restRatio": 0.665
+        "velocityStd": 0.119,
+        "ioiEntropyBits": 3.794,
+        "restRatio": 0.695
       },
       "digitaktSteps": {
         "activeRatio": 0.563,
