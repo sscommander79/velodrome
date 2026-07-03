@@ -1,4 +1,5 @@
 import { NormalizedRide, MidiConfig, MusicalKey, MusicalMode } from "@/lib/types";
+import { euclideanPattern } from "./euclidean";
 
 export interface StepData {
   note: number;      // MIDI note 0-127
@@ -69,6 +70,15 @@ export function segmentRide(
   const speedMax = Math.max(...speeds);
   const speedRange = Math.max(1, speedMax - speedMin);
 
+  const cadences = points.map(p => p.cadence);
+  const powers = points.map(p => p.power);
+  const rideMeanCadence = mean(cadences);
+  const rideMeanPower = mean(powers);
+  const maxPower = Math.max(1, ...powers);
+  const k = clamp(Math.round(3 + ((rideMeanCadence - 30) / 100) * 9), 6, 12);
+  const rotation = Math.round(clamp(rideMeanPower / maxPower, 0, 1) * 3);
+  const activeMask = euclideanPattern(k, 16, rotation);
+
   const steps: StepData[] = [];
 
   for (let i = 0; i < stepCount; i++) {
@@ -87,10 +97,11 @@ export function segmentRide(
     const speedNorm = (avgSpeed - speedMin) / speedRange;
     const velocity = clamp(Math.round(40 + speedNorm * 87), 1, 127);
 
-    const active = avgCadence > 20;
+    const active = avgCadence > 20 && activeMask[i % 16];
 
     // Elektron step length: 0x00=1/128, 0x18=1/8, 0x30=1/4, 0x60=1/2, 0x7F=full
-    const length = 0x7f;
+    const cadenceNorm = (clamp(avgCadence, 30, 130) - 30) / 100;
+    const length = clamp(Math.round(0x20 + cadenceNorm * (0x7f - 0x20)), 0x20, 0x7f);
 
     steps.push({ note, velocity, length, active });
   }

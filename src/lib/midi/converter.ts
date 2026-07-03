@@ -3,11 +3,10 @@ import { NormalizedRide, MidiConfig, ConversionResult } from '../types';
 import {
   buildScaleNotes,
   elevationToPitch,
-  cadenceToNoteDuration,
-  noteDurationToBeats,
   speedToBpm,
   heartRateToVelocity,
 } from './scales';
+import { euclideanPattern } from './euclidean';
 
 const PHRASE_BARS = 4;
 const BEATS_PER_BAR = 4;
@@ -19,6 +18,7 @@ const PERC_KICK = 36;
 const PERC_SNARE = 38;
 
 const YIELD_EVERY = 50;
+const STEPS_PER_BAR = 16;
 
 function averageOf(arr: number[], start: number, end: number): number {
   const slice = arr.slice(start, end);
@@ -28,6 +28,10 @@ function averageOf(arr: number[], start: number, end: number): number {
 
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function clamp(val: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, val));
 }
 
 export async function convertToMidi(
@@ -56,14 +60,18 @@ export async function convertToMidi(
   let maxAlt = -Infinity;
   let minHr = Infinity;
   let maxHr = -Infinity;
+  let maxPower = -Infinity;
   for (let k = 0; k < points.length; k++) {
     const a = altitudes[k];
     const h = heartRates[k];
+    const p = powers[k];
     if (a < minAlt) minAlt = a;
     if (a > maxAlt) maxAlt = a;
     if (h < minHr) minHr = h;
     if (h > maxHr) maxHr = h;
+    if (p > maxPower) maxPower = p;
   }
+  if (!Number.isFinite(maxPower) || maxPower <= 0) maxPower = 1;
 
   const midi = new Midi();
 
@@ -116,24 +124,32 @@ export async function convertToMidi(
       Math.min(130, avgCadence * SENSITIVITY + 80 * (1 - SENSITIVITY))
     );
 
-    const durationName = cadenceToNoteDuration(smoothedCadence);
-    const durationBeats = noteDurationToBeats(durationName);
-    const durationSec = durationBeats * beatDurationSec;
-
     const pitch = elevationToPitch(avgAlt, minAlt, maxAlt, scaleNotes);
     const velocity = heartRateToVelocity(avgHr, minHr, maxHr);
 
-    const numNotesInPhrase = Math.max(1, Math.floor(phraseDurationSec / durationSec));
+    const stepDurationSec = beatDurationSec / 4;
+    const barDurationSec = beatDurationSec * BEATS_PER_BAR;
+    const pulses = clamp(Math.round(3 + ((smoothedCadence - 30) / 100) * 9), 3, 12);
+    const powerNorm = clamp(avgPower / maxPower, 0, 1);
+    const rotation = Math.round(powerNorm * 3);
+    const pattern = euclideanPattern(pulses, STEPS_PER_BAR, rotation);
+    const phraseEndTimeSec = currentTimeSec + phraseDurationSec;
+    const barsInPhrase = Math.ceil(phraseDurationSec / barDurationSec);
 
-    for (let n = 0; n < numNotesInPhrase; n++) {
-      const noteTime = currentTimeSec + n * durationSec;
-      melodicTrack.addNote({
-        midi: pitch,
-        time: noteTime,
-        duration: durationSec * 0.85,
-        velocity,
-      });
-      noteCount++;
+    for (let bar = 0; bar < barsInPhrase; bar++) {
+      const barStartTime = currentTimeSec + bar * barDurationSec;
+      for (let step = 0; step < STEPS_PER_BAR; step++) {
+        const noteTime = barStartTime + step * stepDurationSec;
+        if (noteTime >= phraseEndTimeSec - 1e-9) break;
+        if (!pattern[step]) continue;
+        melodicTrack.addNote({
+          midi: pitch,
+          time: noteTime,
+          duration: Math.min(stepDurationSec * 0.8, phraseEndTimeSec - noteTime),
+          velocity,
+        });
+        noteCount++;
+      }
     }
 
     addPercussionPhrase(
