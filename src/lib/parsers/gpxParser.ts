@@ -44,12 +44,21 @@ export async function parseGpxFile(file: File): Promise<ParsedRide> {
 
   const trkpts = Array.from(doc.querySelectorAll('trkpt'));
 
-  const points: RidePoint[] = trkpts.map((pt) => {
+  // Some Strava exports (e.g. shared activities) omit <time> entirely.
+  // Fall back to synthetic 1 Hz timestamps so the ride still converts;
+  // speed is then derived from GPS distance downstream.
+  const hasAnyTime = trkpts.some((pt) => pt.querySelector('time')?.textContent);
+
+  const points: RidePoint[] = trkpts.map((pt, idx) => {
     const lat = safeFloat(pt.getAttribute('lat'));
     const lng = safeFloat(pt.getAttribute('lon'));
     const ele = safeFloat(pt.querySelector('ele')?.textContent);
     const timeStr = pt.querySelector('time')?.textContent;
-    const timestamp = timeStr ? new Date(timeStr).getTime() : NaN;
+    const timestamp = timeStr
+      ? new Date(timeStr).getTime()
+      : hasAnyTime
+        ? NaN
+        : idx * 1000;
 
     const hr =
       safeInt(pt.querySelector('gpxtpx\\:hr')?.textContent) ??

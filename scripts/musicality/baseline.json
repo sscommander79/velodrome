@@ -1,0 +1,152 @@
+{
+  "cycling": {
+    "ride": {
+      "points": 4813,
+      "durationMin": 80,
+      "elevationGain": 364,
+      "availability": {
+        "cadence": "estimated",
+        "speed": "estimated",
+        "altitude": "recorded",
+        "heartRate": "estimated",
+        "power": "estimated"
+      }
+    },
+    "conversion": {
+      "noteCount": 17264,
+      "musicDurationMin": 80,
+      "bpmRange": [
+        60,
+        160
+      ]
+    },
+    "melody": {
+      "noteCount": 17264,
+      "uniquePitches": 36,
+      "pitchEntropyBits": 4.475,
+      "topPitchDominance": 0.178,
+      "consecutiveRepeatRate": 0.989,
+      "fourGramRepeatRate": 0.983,
+      "intervalStatic": 0.989,
+      "intervalStep": 0.01,
+      "intervalLeap": 0.001,
+      "restRatio": 0.15,
+      "velocityStd": 0.127,
+      "ioiEntropyBits": 5.331,
+      "adjacentWindowSimilarity": 0.413,
+      "inScaleRate": 1
+    },
+    "percussion": {
+      "noteCount": 14412,
+      "uniqueInstruments": 4,
+      "velocityStd": 0.087,
+      "ioiEntropyBits": 7.145,
+      "restRatio": 0.799
+    },
+    "digitaktSteps": {
+      "activeRatio": 1,
+      "uniqueNotes": 11,
+      "velocityStd": 8
+    }
+  },
+  "shadow-mountain": {
+    "ride": {
+      "points": 8345,
+      "durationMin": 139,
+      "elevationGain": 543,
+      "availability": {
+        "cadence": "estimated",
+        "speed": "estimated",
+        "altitude": "recorded",
+        "heartRate": "estimated",
+        "power": "estimated"
+      }
+    },
+    "conversion": {
+      "noteCount": 24112,
+      "musicDurationMin": 138.8,
+      "bpmRange": [
+        60,
+        135
+      ]
+    },
+    "melody": {
+      "noteCount": 24112,
+      "uniquePitches": 36,
+      "pitchEntropyBits": 4.333,
+      "topPitchDominance": 0.243,
+      "consecutiveRepeatRate": 0.997,
+      "fourGramRepeatRate": 0.99,
+      "intervalStatic": 0.997,
+      "intervalStep": 0.003,
+      "intervalLeap": 0,
+      "restRatio": 0.15,
+      "velocityStd": 0.103,
+      "ioiEntropyBits": 5.478,
+      "adjacentWindowSimilarity": 0.239,
+      "inScaleRate": 1
+    },
+    "percussion": {
+      "noteCount": 23169,
+      "uniqueInstruments": 4,
+      "velocityStd": 0.084,
+      "ioiEntropyBits": 7.227,
+      "restRatio": 0.815
+    },
+    "digitaktSteps": {
+      "activeRatio": 1,
+      "uniqueNotes": 8,
+      "velocityStd": 13.7
+    }
+  },
+  "went-fast": {
+    "ride": {
+      "points": 13874,
+      "durationMin": 231,
+      "elevationGain": 1233,
+      "availability": {
+        "cadence": "estimated",
+        "speed": "estimated",
+        "altitude": "recorded",
+        "heartRate": "estimated",
+        "power": "estimated"
+      }
+    },
+    "conversion": {
+      "noteCount": 94032,
+      "musicDurationMin": 231.7,
+      "bpmRange": [
+        60,
+        160
+      ]
+    },
+    "melody": {
+      "noteCount": 94032,
+      "uniquePitches": 36,
+      "pitchEntropyBits": 4.793,
+      "topPitchDominance": 0.117,
+      "consecutiveRepeatRate": 0.993,
+      "fourGramRepeatRate": 0.997,
+      "intervalStatic": 0.993,
+      "intervalStep": 0.007,
+      "intervalLeap": 0,
+      "restRatio": 0.15,
+      "velocityStd": 0.081,
+      "ioiEntropyBits": 3.82,
+      "adjacentWindowSimilarity": 0.436,
+      "inScaleRate": 1
+    },
+    "percussion": {
+      "noteCount": 50795,
+      "uniqueInstruments": 4,
+      "velocityStd": 0.094,
+      "ioiEntropyBits": 6.726,
+      "restRatio": 0.75
+    },
+    "digitaktSteps": {
+      "activeRatio": 1,
+      "uniqueNotes": 10,
+      "velocityStd": 3.1
+    }
+  }
+}
