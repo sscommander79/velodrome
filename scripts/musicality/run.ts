@@ -29,6 +29,7 @@ const CONFIG: MidiConfig = {
   tempoMin: 60,
   tempoMax: 160,
   rhythmicSensitivity: 0.5,
+  targetBars: 64,
 };
 
 function round(obj: Record<string, number>): Record<string, number> {
@@ -37,18 +38,19 @@ function round(obj: Record<string, number>): Record<string, number> {
   );
 }
 
-async function scoreFixture(name: string) {
+async function scoreFixture(name: string, targetBars: number | null, midiName: string) {
   const parsed = readGpx(join(DIR, 'fixtures', `${name}.gpx`));
   const ride = normalizeRide(parsed);
-  const result = await convertToMidi(ride, CONFIG);
+  const config: MidiConfig = { ...CONFIG, targetBars };
+  const result = await convertToMidi(ride, config);
 
   mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(join(OUT_DIR, `${name}.mid`), result.midiBytes);
+  writeFileSync(join(OUT_DIR, midiName), result.midiBytes);
 
   const midi = new Midi(result.midiBytes);
   const span = result.durationSeconds;
 
-  const steps = segmentRide(ride, 16, CONFIG);
+  const steps = segmentRide(ride, 16, config);
   const stepNotes = steps.filter((s) => s.active).map((s) => s.note);
 
   return {
@@ -63,7 +65,7 @@ async function scoreFixture(name: string) {
       musicDurationMin: Math.round((span / 60) * 10) / 10,
       bpmRange: result.bpmRange,
     },
-    melody: round(melodicMetrics(midi, CONFIG, span) as unknown as Record<string, number>),
+    melody: round(melodicMetrics(midi, config, span) as unknown as Record<string, number>),
     percussion: round(percussionMetrics(midi, span) as unknown as Record<string, number>),
     digitaktSteps: {
       activeRatio: Math.round((steps.filter((s) => s.active).length / steps.length) * 1000) / 1000,
@@ -103,7 +105,10 @@ async function main() {
 
   for (const name of FIXTURES) {
     console.log(`Scoring ${name}...`);
-    scoreboard[name] = await scoreFixture(name);
+    scoreboard[name] = {
+      full: await scoreFixture(name, null, `${name}.mid`),
+      bars64: await scoreFixture(name, 64, `${name}-64bars.mid`),
+    };
   }
 
   writeFileSync(join(OUT_DIR, 'scoreboard.json'), JSON.stringify(scoreboard, null, 2));
@@ -120,7 +125,7 @@ async function main() {
     console.log('\n=== Changes vs baseline ===');
     let any = false;
     for (const name of FIXTURES) {
-      const diffs = compare(baseline[name], scoreboard[name]);
+      const diffs = compare(baseline[name], scoreboard[name].full);
       if (diffs.length) {
         any = true;
         console.log(`\n${name}:`);
@@ -134,12 +139,16 @@ async function main() {
 
   console.log('\n=== Summary ===');
   for (const name of FIXTURES) {
-    const m = scoreboard[name].melody;
+    const full = scoreboard[name].full;
+    const bars64 = scoreboard[name].bars64;
+    const m = bars64.melody;
     console.log(
-      `${name}: notes=${scoreboard[name].conversion.noteCount} ` +
+      `${name}: fullNotes=${full.conversion.noteCount} bars64Notes=${bars64.conversion.noteCount} ` +
+      `bars64Duration=${bars64.conversion.musicDurationMin} ` +
       `uniquePitches=${m.uniquePitches} repeatRate=${m.consecutiveRepeatRate} ` +
       `4gramRepeat=${m.fourGramRepeatRate} restRatio=${m.restRatio} ` +
-      `velStd=${m.velocityStd} inScale=${m.inScaleRate}`
+      `adjacentWindowSimilarity=${m.adjacentWindowSimilarity} velStd=${m.velocityStd} ` +
+      `inScale=${m.inScaleRate}`
     );
   }
 }

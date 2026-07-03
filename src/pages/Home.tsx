@@ -42,6 +42,7 @@ export function Home() {
     tempoMin: 60,
     tempoMax: 160,
     rhythmicSensitivity: 0.5,
+    targetBars: 64,
   });
 
   const handleRideParsed = (newRide: NormalizedRide) => {

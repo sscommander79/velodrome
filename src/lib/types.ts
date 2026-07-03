@@ -56,6 +56,7 @@ export interface MidiConfig {
   tempoMin: number;
   tempoMax: number;
   rhythmicSensitivity: number;
+  targetBars: number | null;
 }
 
 export interface ConversionResult {

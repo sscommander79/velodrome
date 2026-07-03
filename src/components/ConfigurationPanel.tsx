@@ -16,6 +16,14 @@ const MODE_DESCRIPTIONS: Record<MusicalMode, string> = {
   pentatonic: "Spacious, floating, cinematic.",
 };
 
+const LENGTH_OPTIONS = [
+  { value: "full", label: "Full ride", targetBars: null },
+  { value: "16", label: "16 bars", targetBars: 16 },
+  { value: "32", label: "32 bars", targetBars: 32 },
+  { value: "64", label: "64 bars", targetBars: 64 },
+  { value: "128", label: "128 bars", targetBars: 128 },
+] as const;
+
 export function ConfigurationPanel({ config, onChange }: ConfigurationPanelProps) {
   return (
     <div className="space-y-8 bg-card border border-border/50 p-6 md:p-8">
@@ -47,6 +55,28 @@ export function ConfigurationPanel({ config, onChange }: ConfigurationPanelProps
           </Select>
           <p className="text-xs text-muted-foreground italic">{MODE_DESCRIPTIONS[config.mode]}</p>
         </div>
+      </div>
+
+      {/* Length */}
+      <div className="space-y-4 pt-4 border-t border-border/50">
+        <Label className="uppercase tracking-widest text-xs text-muted-foreground font-mono">Length</Label>
+        <Select
+          value={config.targetBars === null ? "full" : String(config.targetBars)}
+          onValueChange={(val) =>
+            onChange({ targetBars: val === "full" ? null : Number(val) })
+          }
+        >
+          <SelectTrigger className="font-mono bg-background border-border/50 rounded-none h-12">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="rounded-none bg-card border-border">
+            {LENGTH_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value} className="font-mono">
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Tempo */}

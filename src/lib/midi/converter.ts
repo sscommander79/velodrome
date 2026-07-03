@@ -49,6 +49,7 @@ export async function convertToMidi(
   // Hoist per-field arrays out of the phrase loop below — rebuilding these
   // inside the loop was O(phrases × points) allocations.
   const cadences = points.map((p) => p.cadence);
+  const speeds = points.map((p) => p.speed);
   const altitudes = points.map((p) => p.altitude);
   const heartRates = points.map((p) => p.heartRate);
   const powers = points.map((p) => p.power);
@@ -89,35 +90,19 @@ export async function convertToMidi(
 
   const SENSITIVITY = Math.max(0.1, Math.min(1, config.rhythmicSensitivity));
 
-  let i = 0;
-  let phraseCount = 0;
-
-  while (i < points.length) {
-    if (phraseCount % YIELD_EVERY === 0) {
-      onProgress?.(i / points.length);
-      await yieldToEventLoop();
-    }
-    phraseCount++;
-
-    const bpm = speedToBpm(points[i].speed, config.tempoMin, config.tempoMax);
+  // Emit one 4-bar phrase for the point slice [start, end) at the given BPM.
+  // Shared by both drivers below so the note/rhythm logic exists exactly once.
+  const emitPhrase = (start: number, end: number, bpm: number): void => {
     minBpmSeen = Math.min(minBpmSeen, bpm);
     maxBpmSeen = Math.max(maxBpmSeen, bpm);
 
     const beatDurationSec = 60 / bpm;
     const phraseDurationSec = PHRASE_BEATS * beatDurationSec;
 
-    const secondsPerPoint =
-      i < points.length - 1
-        ? Math.max(0.1, (points[i + 1].timestamp - points[i].timestamp) / 1000)
-        : 1;
-
-    const pointsInPhrase = Math.max(1, Math.round(phraseDurationSec / secondsPerPoint));
-    const phraseEnd = Math.min(i + pointsInPhrase, points.length);
-
-    const avgCadence = averageOf(cadences, i, phraseEnd);
-    const avgAlt = averageOf(altitudes, i, phraseEnd);
-    const avgHr = averageOf(heartRates, i, phraseEnd);
-    const avgPower = averageOf(powers, i, phraseEnd);
+    const avgCadence = averageOf(cadences, start, end);
+    const avgAlt = averageOf(altitudes, start, end);
+    const avgHr = averageOf(heartRates, start, end);
+    const avgPower = averageOf(powers, start, end);
 
     const smoothedCadence = Math.max(
       30,
@@ -164,7 +149,53 @@ export async function convertToMidi(
     );
 
     currentTimeSec += phraseDurationSec;
-    i = phraseEnd;
+  };
+
+  if (config.targetBars !== null) {
+    // Compressed: the whole ride squeezed into targetBars. Equal point
+    // slices, so each phrase covers the same share of the ride; BPM comes
+    // from the slice-average speed rather than one instantaneous reading.
+    const numPhrases = Math.max(1, Math.round(config.targetBars / PHRASE_BARS));
+    for (let phrase = 0; phrase < numPhrases; phrase++) {
+      if (phrase % YIELD_EVERY === 0) {
+        onProgress?.(phrase / numPhrases);
+        await yieldToEventLoop();
+      }
+      const start = Math.floor((phrase * points.length) / numPhrases);
+      const end =
+        phrase === numPhrases - 1
+          ? points.length
+          : Math.max(start + 1, Math.floor(((phrase + 1) * points.length) / numPhrases));
+      const bpm = speedToBpm(averageOf(speeds, start, end), config.tempoMin, config.tempoMax);
+      emitPhrase(start, end, bpm);
+    }
+  } else {
+    // Full ride 1:1: each phrase consumes as many points as fit in 4 bars
+    // of real elapsed time at that phrase's BPM.
+    let i = 0;
+    let phraseCount = 0;
+    while (i < points.length) {
+      if (phraseCount % YIELD_EVERY === 0) {
+        onProgress?.(i / points.length);
+        await yieldToEventLoop();
+      }
+      phraseCount++;
+
+      const bpm = speedToBpm(points[i].speed, config.tempoMin, config.tempoMax);
+      const beatDurationSec = 60 / bpm;
+      const phraseDurationSec = PHRASE_BEATS * beatDurationSec;
+
+      const secondsPerPoint =
+        i < points.length - 1
+          ? Math.max(0.1, (points[i + 1].timestamp - points[i].timestamp) / 1000)
+          : 1;
+
+      const pointsInPhrase = Math.max(1, Math.round(phraseDurationSec / secondsPerPoint));
+      const phraseEnd = Math.min(i + pointsInPhrase, points.length);
+
+      emitPhrase(i, phraseEnd, bpm);
+      i = phraseEnd;
+    }
   }
 
   onProgress?.(1);
