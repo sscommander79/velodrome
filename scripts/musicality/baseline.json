@@ -13,7 +13,7 @@
       }
     },
     "conversion": {
-      "noteCount": 17264,
+      "noteCount": 15036,
       "musicDurationMin": 80,
       "bpmRange": [
         60,
@@ -21,19 +21,19 @@
       ]
     },
     "melody": {
-      "noteCount": 17264,
+      "noteCount": 15036,
       "uniquePitches": 36,
-      "pitchEntropyBits": 4.475,
-      "topPitchDominance": 0.178,
-      "consecutiveRepeatRate": 0.989,
-      "fourGramRepeatRate": 0.983,
-      "intervalStatic": 0.989,
-      "intervalStep": 0.01,
+      "pitchEntropyBits": 4.373,
+      "topPitchDominance": 0.199,
+      "consecutiveRepeatRate": 0.987,
+      "fourGramRepeatRate": 0.981,
+      "intervalStatic": 0.987,
+      "intervalStep": 0.012,
       "intervalLeap": 0.001,
-      "restRatio": 0.15,
-      "velocityStd": 0.127,
-      "ioiEntropyBits": 5.331,
-      "adjacentWindowSimilarity": 0.413,
+      "restRatio": 0.616,
+      "velocityStd": 0.112,
+      "ioiEntropyBits": 5.647,
+      "adjacentWindowSimilarity": 0.396,
       "inScaleRate": 1
     },
     "percussion": {
@@ -44,9 +44,9 @@
       "restRatio": 0.799
     },
     "digitaktSteps": {
-      "activeRatio": 1,
-      "uniqueNotes": 11,
-      "velocityStd": 8
+      "activeRatio": 0.5,
+      "uniqueNotes": 6,
+      "velocityStd": 8.8
     }
   },
   "shadow-mountain": {
@@ -63,7 +63,7 @@
       }
     },
     "conversion": {
-      "noteCount": 24112,
+      "noteCount": 22800,
       "musicDurationMin": 138.8,
       "bpmRange": [
         60,
@@ -71,19 +71,19 @@
       ]
     },
     "melody": {
-      "noteCount": 24112,
+      "noteCount": 22800,
       "uniquePitches": 36,
-      "pitchEntropyBits": 4.333,
-      "topPitchDominance": 0.243,
-      "consecutiveRepeatRate": 0.997,
-      "fourGramRepeatRate": 0.99,
-      "intervalStatic": 0.997,
-      "intervalStep": 0.003,
+      "pitchEntropyBits": 4.26,
+      "topPitchDominance": 0.255,
+      "consecutiveRepeatRate": 0.996,
+      "fourGramRepeatRate": 0.989,
+      "intervalStatic": 0.996,
+      "intervalStep": 0.004,
       "intervalLeap": 0,
-      "restRatio": 0.15,
-      "velocityStd": 0.103,
-      "ioiEntropyBits": 5.478,
-      "adjacentWindowSimilarity": 0.239,
+      "restRatio": 0.624,
+      "velocityStd": 0.101,
+      "ioiEntropyBits": 5.814,
+      "adjacentWindowSimilarity": 0.24,
       "inScaleRate": 1
     },
     "percussion": {
@@ -94,9 +94,9 @@
       "restRatio": 0.815
     },
     "digitaktSteps": {
-      "activeRatio": 1,
-      "uniqueNotes": 8,
-      "velocityStd": 13.7
+      "activeRatio": 0.438,
+      "uniqueNotes": 4,
+      "velocityStd": 13.1
     }
   },
   "went-fast": {
@@ -113,7 +113,7 @@
       }
     },
     "conversion": {
-      "noteCount": 94032,
+      "noteCount": 59420,
       "musicDurationMin": 231.7,
       "bpmRange": [
         60,
@@ -121,19 +121,19 @@
       ]
     },
     "melody": {
-      "noteCount": 94032,
+      "noteCount": 59420,
       "uniquePitches": 36,
-      "pitchEntropyBits": 4.793,
-      "topPitchDominance": 0.117,
-      "consecutiveRepeatRate": 0.993,
-      "fourGramRepeatRate": 0.997,
-      "intervalStatic": 0.993,
-      "intervalStep": 0.007,
-      "intervalLeap": 0,
-      "restRatio": 0.15,
-      "velocityStd": 0.081,
-      "ioiEntropyBits": 3.82,
-      "adjacentWindowSimilarity": 0.436,
+      "pitchEntropyBits": 4.861,
+      "topPitchDominance": 0.096,
+      "consecutiveRepeatRate": 0.989,
+      "fourGramRepeatRate": 0.995,
+      "intervalStatic": 0.989,
+      "intervalStep": 0.011,
+      "intervalLeap": 0.001,
+      "restRatio": 0.602,
+      "velocityStd": 0.092,
+      "ioiEntropyBits": 4.602,
+      "adjacentWindowSimilarity": 0.429,
       "inScaleRate": 1
     },
     "percussion": {
@@ -144,8 +144,8 @@
       "restRatio": 0.75
     },
     "digitaktSteps": {
-      "activeRatio": 1,
-      "uniqueNotes": 10,
+      "activeRatio": 0.563,
+      "uniqueNotes": 6,
       "velocityStd": 3.1
     }
   }
