@@ -10,10 +10,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Midi } from '@tonejs/midi';
 import { readGpx } from './gpx';
-import { melodicMetrics, percussionMetrics } from './metrics';
+import { harmonyMetrics, melodicMetrics, percussionMetrics } from './metrics';
 import { normalizeRide } from '../../src/lib/normalize';
 import { convertToMidi } from '../../src/lib/midi/converter';
 import { segmentRide } from '../../src/lib/midi/segmenter';
+import { selectHighlights } from '../../src/lib/midi/highlights';
+import { speedToBpm } from '../../src/lib/midi/scales';
 import type { MidiConfig } from '../../src/lib/types';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
@@ -36,6 +38,41 @@ function round(obj: Record<string, number>): Record<string, number> {
   return Object.fromEntries(
     Object.entries(obj).map(([k, v]) => [k, Math.round(v * 1000) / 1000])
   );
+}
+
+function chordPhraseCounts(
+  ride: ReturnType<typeof normalizeRide>,
+  config: MidiConfig
+): Record<'climbPhrases' | 'descendPhrases' | 'flatPhrases', number> {
+  const counts = { climbPhrases: 0, descendPhrases: 0, flatPhrases: 0 };
+  const { points } = ride;
+  const classify = (start: number, end: number): void => {
+    const gradient = points[Math.max(start, end - 1)].altitude - points[start].altitude;
+    if (gradient > 3) counts.climbPhrases++;
+    else if (gradient < -3) counts.descendPhrases++;
+    else counts.flatPhrases++;
+  };
+
+  if (config.targetBars !== null) {
+    const numPhrases = Math.max(1, Math.round(config.targetBars / 4));
+    for (const { start, end } of selectHighlights(points, numPhrases)) classify(start, end);
+    return counts;
+  }
+
+  let i = 0;
+  while (i < points.length) {
+    const bpm = speedToBpm(points[i].speed, config.tempoMin, config.tempoMax);
+    const phraseDurationSec = 16 * (60 / bpm);
+    const secondsPerPoint =
+      i < points.length - 1
+        ? Math.max(0.1, (points[i + 1].timestamp - points[i].timestamp) / 1000)
+        : 1;
+    const phraseEnd = Math.min(i + Math.max(1, Math.round(phraseDurationSec / secondsPerPoint)), points.length);
+    classify(i, phraseEnd);
+    i = phraseEnd;
+  }
+
+  return counts;
 }
 
 async function scoreFixture(name: string, targetBars: number | null, midiName: string) {
@@ -67,6 +104,10 @@ async function scoreFixture(name: string, targetBars: number | null, midiName: s
     },
     melody: round(melodicMetrics(midi, config, span) as unknown as Record<string, number>),
     percussion: round(percussionMetrics(midi, span) as unknown as Record<string, number>),
+    harmony: {
+      ...round(harmonyMetrics(midi, config, span) as unknown as Record<string, number>),
+      ...chordPhraseCounts(ride, config),
+    },
     digitaktSteps: {
       activeRatio: Math.round((steps.filter((s) => s.active).length / steps.length) * 1000) / 1000,
       uniqueNotes: new Set(stepNotes).size,
@@ -125,7 +166,7 @@ async function main() {
     console.log('\n=== Changes vs baseline ===');
     let any = false;
     for (const name of FIXTURES) {
-      const diffs = compare(baseline[name], scoreboard[name].full);
+      const diffs = compare(baseline[name], scoreboard[name]);
       if (diffs.length) {
         any = true;
         console.log(`\n${name}:`);
@@ -142,13 +183,15 @@ async function main() {
     const full = scoreboard[name].full;
     const bars64 = scoreboard[name].bars64;
     const m = bars64.melody;
+    const h = bars64.harmony;
     console.log(
       `${name}: fullNotes=${full.conversion.noteCount} bars64Notes=${bars64.conversion.noteCount} ` +
       `bars64Duration=${bars64.conversion.musicDurationMin} ` +
       `uniquePitches=${m.uniquePitches} repeatRate=${m.consecutiveRepeatRate} ` +
       `4gramRepeat=${m.fourGramRepeatRate} restRatio=${m.restRatio} ` +
       `adjacentWindowSimilarity=${m.adjacentWindowSimilarity} velStd=${m.velocityStd} ` +
-      `inScale=${m.inScaleRate}`
+      `inScale=${m.inScaleRate} harmonyNotes=${h.noteCount} harmonyInScale=${h.inScaleRate} ` +
+      `harmonyVelStd=${h.velocityStd} climb=${h.climbPhrases} descend=${h.descendPhrases} flat=${h.flatPhrases}`
     );
   }
 }

@@ -128,8 +128,34 @@ export interface TrackMetrics {
   inScaleRate: number;            // guardrail: must stay ~1.0
 }
 
-export function melodicMetrics(midi: Midi, config: MidiConfig, spanSec: number): TrackMetrics {
-  const track = midi.tracks.find((t) => t.channel !== 9) ?? midi.tracks[0];
+function emptyTrackMetrics(): TrackMetrics {
+  return {
+    noteCount: 0,
+    uniquePitches: 0,
+    pitchEntropyBits: 0,
+    topPitchDominance: 0,
+    consecutiveRepeatRate: 0,
+    fourGramRepeatRate: 0,
+    intervalStatic: 0,
+    intervalStep: 0,
+    intervalLeap: 0,
+    restRatio: 1,
+    velocityStd: 0,
+    ioiEntropyBits: 0,
+    adjacentWindowSimilarity: 1,
+    inScaleRate: 1,
+  };
+}
+
+function trackMetrics(
+  midi: Midi,
+  config: MidiConfig,
+  spanSec: number,
+  selectTrack: (midi: Midi) => Midi['tracks'][number] | undefined
+): TrackMetrics {
+  const track = selectTrack(midi);
+  if (!track) return emptyTrackMetrics();
+
   const notes: SimpleNote[] = track.notes.map((n) => ({
     midi: n.midi,
     time: n.time,
@@ -182,6 +208,14 @@ export function melodicMetrics(midi: Midi, config: MidiConfig, spanSec: number):
     adjacentWindowSimilarity: adjacentWindowSimilarity(notes, spanSec),
     inScaleRate: notes.length ? inScale / notes.length : 1,
   };
+}
+
+export function melodicMetrics(midi: Midi, config: MidiConfig, spanSec: number): TrackMetrics {
+  return trackMetrics(midi, config, spanSec, (m) => m.tracks.find((t) => t.channel !== 9) ?? m.tracks[0]);
+}
+
+export function harmonyMetrics(midi: Midi, config: MidiConfig, spanSec: number): TrackMetrics {
+  return trackMetrics(midi, config, spanSec, (m) => m.tracks.find((t) => t.name === 'Harmony (Gradient)'));
 }
 
 export interface PercMetrics {

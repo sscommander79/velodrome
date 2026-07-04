@@ -80,6 +80,10 @@ export async function convertToMidi(
   const melodicTrack = midi.addTrack();
   melodicTrack.name = 'Melody (Elevation)';
 
+  const harmonyTrack = midi.addTrack();
+  harmonyTrack.name = 'Harmony (Gradient)';
+  harmonyTrack.channel = 1;
+
   const percTrack = midi.addTrack();
   percTrack.name = 'Rhythm (Cadence)';
   percTrack.channel = 9;
@@ -191,6 +195,23 @@ export async function convertToMidi(
       noteCount++;
       previousPitch = pitch;
     }
+
+    addHarmonyPhrase(
+      harmonyTrack,
+      currentTimeSec,
+      phraseDurationSec,
+      beatDurationSec,
+      start,
+      end,
+      altitudes,
+      speeds,
+      avgHr,
+      minHr,
+      maxHr,
+      minAlt,
+      maxAlt,
+      scaleNotes
+    );
 
     addPercussionPhrase(
       percTrack,
@@ -343,4 +364,78 @@ function addPercussionPhrase(
       }
     }
   }
+}
+
+function addHarmonyPhrase(
+  track: ReturnType<Midi['addTrack']>,
+  startTime: number,
+  phraseDuration: number,
+  beatDuration: number,
+  start: number,
+  end: number,
+  altitudes: number[],
+  speeds: number[],
+  avgHr: number,
+  minHr: number,
+  maxHr: number,
+  minAlt: number,
+  maxAlt: number,
+  scaleNotes: number[]
+): void {
+  if (scaleNotes.length === 0 || end <= start) return;
+
+  const degreesPerOctave = new Set(scaleNotes.map((note) => ((note % 12) + 12) % 12)).size;
+  const avgAlt = averageOf(altitudes, start, end);
+  const basePitch = elevationToPitch(avgAlt, minAlt, maxAlt, scaleNotes);
+  const baseIndex = Math.max(0, scaleNotes.indexOf(basePitch));
+  const gradient = altitudes[Math.max(start, end - 1)] - altitudes[start];
+  const maxChordOffset = gradient > 3 ? 6 : 4;
+  const rootIndex = clamp(
+    baseIndex - degreesPerOctave,
+    0,
+    Math.max(0, scaleNotes.length - 1 - maxChordOffset)
+  );
+  const chordIndices =
+    gradient > 3
+      ? [rootIndex, rootIndex + 2, rootIndex + 4, rootIndex + 6]
+      : gradient < -3
+        ? [rootIndex, rootIndex + 2, rootIndex + 4]
+        : [rootIndex, rootIndex + 3, rootIndex + 4];
+  const chordNotes = chordIndices.map((index) => scaleNotes[index]);
+
+  const mid = start + Math.floor((end - start) / 2);
+  const firstHalfSpeed = averageOf(speeds, start, Math.max(start + 1, mid));
+  const secondHalfSpeed = averageOf(speeds, mid, end);
+  const speedRatio = firstHalfSpeed > 0 ? secondHalfSpeed / firstHalfSpeed : 1;
+  const direction = speedRatio > 1.05 ? 'up' : speedRatio < 0.95 ? 'down' : 'pingpong';
+
+  const eighthDuration = beatDuration / 2;
+  const barEighths = BEATS_PER_BAR * 2;
+  const totalEighths = Math.ceil(phraseDuration / eighthDuration);
+  const phraseEndTime = startTime + phraseDuration;
+  const baseVelocity = heartRateToVelocity(avgHr, minHr, maxHr) - 0.12;
+
+  for (let step = 0; step < totalEighths; step++) {
+    const noteTime = startTime + step * eighthDuration;
+    if (noteTime >= phraseEndTime - 1e-9) break;
+
+    const chordPosition = harmonyChordPosition(step, chordNotes.length, direction);
+    const velocity = clamp(baseVelocity + (step % barEighths === 0 ? 0.08 : 0), 0.05, 0.9);
+    track.addNote({
+      midi: chordNotes[chordPosition],
+      time: noteTime,
+      duration: Math.min(eighthDuration * 0.9, phraseEndTime - noteTime),
+      velocity,
+    });
+  }
+}
+
+function harmonyChordPosition(step: number, chordLength: number, direction: 'up' | 'down' | 'pingpong'): number {
+  if (chordLength <= 1) return 0;
+  if (direction === 'up') return step % chordLength;
+  if (direction === 'down') return chordLength - 1 - (step % chordLength);
+
+  const period = chordLength * 2 - 2;
+  const position = step % period;
+  return position < chordLength ? position : period - position;
 }
