@@ -141,6 +141,24 @@ export async function convertToMidi(
     let previousPitch: number | null = null;
     let repeatCycleIndex = 0;
     const neighborCycle = [0, -1, 0, 1];
+    const MAX_LEAP = 7;
+    const LEAP_GATE = 0.6;
+    const ARC_DEPTH = 2;
+    const absGrads = onsets.map((onset, onsetIndex) => {
+      const subStart = clamp(onset.subStart, start, end - 1);
+      const subEnd =
+        onsetIndex < onsets.length - 1
+          ? clamp(onsets[onsetIndex + 1].subStart, subStart + 1, end)
+          : end;
+      const gradStartIndex = clamp(subStart, start, end - 1);
+      const gradEndIndex = clamp(subEnd, start, end - 1);
+      return Math.abs(altitudes[gradEndIndex] - altitudes[gradStartIndex]);
+    });
+    let steepestOnsetIndex = 0;
+    for (let i = 1; i < absGrads.length; i++) {
+      if (absGrads[i] > absGrads[steepestOnsetIndex]) steepestOnsetIndex = i;
+    }
+    const gradPeak = Math.max(absGrads[steepestOnsetIndex] ?? 0, Number.EPSILON);
 
     for (let i = 0; i < onsets.length; i++) {
       const onset = onsets[i];
@@ -155,11 +173,18 @@ export async function convertToMidi(
       const gradStartIndex = clamp(subStart, start, end - 1);
       const gradEndIndex = clamp(subEnd, start, end - 1);
       const grad = altitudes[gradEndIndex] - altitudes[gradStartIndex];
-      const degreeOffset = clamp(Math.round(grad / 2), -3, 3);
-      let pitchIndex = clamp(baseIndex + degreeOffset, 0, scaleNotes.length - 1);
+      const dramaNorm = absGrads[i] / gradPeak;
+      const leapDegrees = Math.sign(grad) * Math.round(dramaNorm * MAX_LEAP);
+      const isLeapOnset = dramaNorm >= LEAP_GATE || i === steepestOnsetIndex;
+      let pitchIndex = clamp(baseIndex + leapDegrees, 0, scaleNotes.length - 1);
+      if (!isLeapOnset) {
+        const arcPos = i / Math.max(1, onsets.length - 1);
+        const arc = Math.round(ARC_DEPTH * Math.sin(Math.PI * arcPos));
+        pitchIndex = clamp(pitchIndex + arc, 0, scaleNotes.length - 1);
+      }
       let pitch = scaleNotes[pitchIndex];
 
-      if (previousPitch !== null && pitch === previousPitch) {
+      if (!isLeapOnset && previousPitch !== null && pitch === previousPitch) {
         pitchIndex = clamp(
           pitchIndex + neighborCycle[repeatCycleIndex % neighborCycle.length],
           0,
@@ -170,7 +195,7 @@ export async function convertToMidi(
       } else {
         repeatCycleIndex = 0;
       }
-      if (previousPitch !== null && Math.abs(pitch - previousPitch) > 2) {
+      if (!isLeapOnset && previousPitch !== null && Math.abs(pitch - previousPitch) > 2) {
         const previousIndex = Math.max(0, scaleNotes.indexOf(previousPitch));
         pitchIndex = clamp(previousIndex + Math.sign(pitchIndex - previousIndex), 0, scaleNotes.length - 1);
         pitch = scaleNotes[pitchIndex];
