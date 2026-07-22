@@ -19,7 +19,6 @@ const PERC_KICK = 36;
 const PERC_SNARE = 38;
 
 const YIELD_EVERY = 50;
-const STEPS_PER_BAR = 16;
 
 function averageOf(arr: number[], start: number, end: number): number {
   const slice = arr.slice(start, end);
@@ -44,6 +43,7 @@ export async function convertToMidi(
   if (points.length === 0) {
     throw new Error('No data points to convert');
   }
+  const S = config.stepsPerBar ?? 16;
 
   const scaleNotes = buildScaleNotes(config.key, config.mode);
 
@@ -113,26 +113,31 @@ export async function convertToMidi(
       Math.min(130, avgCadence * SENSITIVITY + 80 * (1 - SENSITIVITY))
     );
 
-    const stepDurationSec = beatDurationSec / 4;
     const barDurationSec = beatDurationSec * BEATS_PER_BAR;
-    const pulses = clamp(Math.round(3 + ((smoothedCadence - 30) / 100) * 9), 3, 12);
+    const stepDurationSec = barDurationSec / S;
+    const pulses = clamp(
+      Math.round(3 + ((smoothedCadence - 30) / 100) * 9),
+      3,
+      Math.min(12, S)
+    );
     const powerNorm = clamp(avgPower / maxPower, 0, 1);
     const rotation = Math.round(powerNorm * 3);
-    const pattern = euclideanPattern(pulses, STEPS_PER_BAR, rotation);
+    const pattern = euclideanPattern(pulses, S, rotation);
     const phraseEndTimeSec = currentTimeSec + phraseDurationSec;
     const barsInPhrase = Math.ceil(phraseDurationSec / barDurationSec);
     const pointSpan = Math.max(1, end - start);
-    const firstOnsetInHalf = [pattern.findIndex((onset, step) => onset && step < 8), -1];
-    firstOnsetInHalf[1] = pattern.findIndex((onset, step) => onset && step >= 8);
+    const halfStep = Math.round(S / 2);
+    const firstOnsetInHalf = [pattern.findIndex((onset, step) => onset && step < halfStep), -1];
+    firstOnsetInHalf[1] = pattern.findIndex((onset, step) => onset && step >= halfStep);
     const onsets: Array<{ bar: number; step: number; time: number; subStart: number }> = [];
 
     for (let bar = 0; bar < barsInPhrase; bar++) {
       const barStartTime = currentTimeSec + bar * barDurationSec;
-      for (let step = 0; step < STEPS_PER_BAR; step++) {
+      for (let step = 0; step < S; step++) {
         const noteTime = barStartTime + step * stepDurationSec;
         if (noteTime >= phraseEndTimeSec - 1e-9) break;
         if (!pattern[step]) continue;
-        const pos = (bar * STEPS_PER_BAR + step) / (barsInPhrase * STEPS_PER_BAR);
+        const pos = (bar * S + step) / (barsInPhrase * S);
         const subStart = start + Math.floor(pos * pointSpan);
         onsets.push({ bar, step, time: noteTime, subStart });
       }
@@ -248,6 +253,7 @@ export async function convertToMidi(
       avgHr,
       minHr,
       maxHr,
+      S,
       phraseIndex
     );
 
@@ -322,26 +328,32 @@ function addPercussionPhrase(
   avgHr: number,
   minHr: number,
   maxHr: number,
+  stepsPerBar: number,
   phraseIndex: number
 ): void {
   const beatDuration = 60 / bpm;
-  const stepDuration = beatDuration / 4;
   const barDuration = beatDuration * BEATS_PER_BAR;
+  const stepDuration = barDuration / stepsPerBar;
   const barsInPhrase = Math.ceil(phraseDuration / barDuration);
   const phraseEndTime = startTime + phraseDuration;
-  const kickPulses = clamp(2 + Math.round(powerNorm * 3), 2, 5);
-  const kickPattern = euclideanPattern(kickPulses, STEPS_PER_BAR, 0);
+  const kickPulses = clamp(2 + Math.round(powerNorm * 3), 2, Math.min(5, stepsPerBar));
+  const kickPattern = euclideanPattern(kickPulses, stepsPerBar, 0);
   const hrRange = maxHr - minHr;
   const hrNorm = hrRange > 0 ? clamp((avgHr - minHr) / hrRange, 0, 1) : 0;
   const baseHatNote = cadenceRpm > 80 ? PERC_HIHAT_CLOSED : PERC_HIHAT_OPEN;
   const fillPhrase = (phraseIndex + 1) % 4 === 0;
   const fillVelocities = [0.4, 0.5, 0.65, 0.8];
+  const quarterStep = Math.round(stepsPerBar / 4);
+  const threeQuarterStep = Math.round((3 * stepsPerBar) / 4);
+  const ghostStep = Math.floor(stepsPerBar - 1);
+  const hatEvery = Math.max(1, Math.round(stepsPerBar / 8));
+  const lastHatStep = Math.floor(stepsPerBar - hatEvery);
 
   for (let bar = 0; bar < barsInPhrase; bar++) {
     const barStartTime = startTime + bar * barDuration;
     const isFillBar = fillPhrase && bar === barsInPhrase - 1;
 
-    for (let step = 0; step < STEPS_PER_BAR; step++) {
+    for (let step = 0; step < stepsPerBar; step++) {
       const noteTime = barStartTime + step * stepDuration;
       if (noteTime >= phraseEndTime - 1e-9) break;
 
@@ -354,21 +366,26 @@ function addPercussionPhrase(
         });
       }
 
-      if (isFillBar && step >= 12) {
+      if (isFillBar && step >= threeQuarterStep) {
+        const fillVelocityIndex = clamp(
+          Math.floor(((step - threeQuarterStep) / quarterStep) * fillVelocities.length),
+          0,
+          fillVelocities.length - 1
+        );
         track.addNote({
           midi: PERC_SNARE,
           time: noteTime,
           duration: 0.08,
-          velocity: fillVelocities[step - 12],
+          velocity: fillVelocities[fillVelocityIndex],
         });
-      } else if (step === 4 || step === 12) {
+      } else if (step === quarterStep || step === threeQuarterStep) {
         track.addNote({
           midi: PERC_SNARE,
           time: noteTime,
           duration: 0.08,
           velocity: 0.55,
         });
-      } else if (step === 15 && hrNorm > 0.6) {
+      } else if (step === ghostStep && hrNorm > 0.6) {
         track.addNote({
           midi: PERC_SNARE,
           time: noteTime,
@@ -377,14 +394,14 @@ function addPercussionPhrase(
         });
       }
 
-      if (step % 2 === 0) {
-        const isLastOffBeat = step === 14;
+      if (step % hatEvery === 0) {
+        const isLastOffBeat = step === lastHatStep;
         const forceOpenAccent = hrNorm > 0.7 && isLastOffBeat;
         track.addNote({
           midi: forceOpenAccent ? PERC_HIHAT_OPEN : baseHatNote,
           time: noteTime,
           duration: 0.05,
-          velocity: forceOpenAccent ? 0.55 : step % 4 === 0 ? 0.62 : 0.38,
+          velocity: forceOpenAccent ? 0.55 : step % quarterStep === 0 ? 0.62 : 0.38,
         });
       }
     }

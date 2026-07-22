@@ -24,6 +24,8 @@ const LENGTH_OPTIONS = [
   { value: "128", label: "128 bars", targetBars: 128 },
 ] as const;
 
+const STEPS_PER_BAR_OPTIONS = [8, 16, 32] as const;
+
 export function ConfigurationPanel({ config, onChange }: ConfigurationPanelProps) {
   return (
     <div className="space-y-8 bg-card border border-border/50 p-6 md:p-8">
@@ -57,26 +59,47 @@ export function ConfigurationPanel({ config, onChange }: ConfigurationPanelProps
         </div>
       </div>
 
-      {/* Length */}
-      <div className="space-y-4 pt-4 border-t border-border/50">
-        <Label className="uppercase tracking-widest text-xs text-muted-foreground font-mono">Length</Label>
-        <Select
-          value={config.targetBars === null ? "full" : String(config.targetBars)}
-          onValueChange={(val) =>
-            onChange({ targetBars: val === "full" ? null : Number(val) })
-          }
-        >
-          <SelectTrigger className="font-mono bg-background border-border/50 rounded-none h-12">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="rounded-none bg-card border-border">
-            {LENGTH_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value} className="font-mono">
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Length & Grid Resolution */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-border/50">
+        <div className="space-y-4">
+          <Label className="uppercase tracking-widest text-xs text-muted-foreground font-mono">Length</Label>
+          <Select
+            value={config.targetBars === null ? "full" : String(config.targetBars)}
+            onValueChange={(val) =>
+              onChange({ targetBars: val === "full" ? null : Number(val) })
+            }
+          >
+            <SelectTrigger className="font-mono bg-background border-border/50 rounded-none h-12">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-none bg-card border-border">
+              {LENGTH_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value} className="font-mono">
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-4">
+          <Label className="uppercase tracking-widest text-xs text-muted-foreground font-mono">Steps Per Bar</Label>
+          <Select
+            value={String(config.stepsPerBar)}
+            onValueChange={(val) => onChange({ stepsPerBar: Number(val) })}
+          >
+            <SelectTrigger className="font-mono bg-background border-border/50 rounded-none h-12">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-none bg-card border-border">
+              {STEPS_PER_BAR_OPTIONS.map((steps) => (
+                <SelectItem key={steps} value={String(steps)} className="font-mono">
+                  {steps}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Tempo */}

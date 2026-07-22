@@ -57,6 +57,7 @@ export interface MidiConfig {
   tempoMax: number;
   rhythmicSensitivity: number;
   targetBars: number | null;
+  stepsPerBar: number;
 }
 
 export interface ConversionResult {
