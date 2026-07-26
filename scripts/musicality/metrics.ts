@@ -111,6 +111,48 @@ function adjacentWindowSimilarity(notes: SimpleNote[], spanSec: number, windows 
   return sims.length ? sims.reduce((x, y) => x + y, 0) / sims.length : 1;
 }
 
+/**
+ * Std of gate length (note duration / inter-onset interval) across the track.
+ * Note-length variety, independent of tempo: ~0 = every note the same relative
+ * length (what the fixed 0.45/0.8/0.95 articulation produces now), higher = a
+ * living mix of short stabs and sustained notes.
+ */
+function gateLengthStd(notes: SimpleNote[]): number {
+  const sorted = [...notes].sort((a, b) => a.time - b.time);
+  const gates: number[] = [];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const ioi = sorted[i + 1].time - sorted[i].time;
+    if (ioi > 1e-6) gates.push(sorted[i].duration / ioi);
+  }
+  return std(gates);
+}
+
+/**
+ * Microtiming / swing. Looks only at consecutive inter-onset intervals that are
+ * meant to be the SAME length (ratio within 15%) — a locally-uniform run. On
+ * quantized output those pairs are exactly equal, so the metric is 0. Real
+ * microtiming perturbs onsets and breaks the equality; measured as mean
+ * |IOI[i]-IOI[i-1]| / mean-IOI over such pairs. Rhythmic syncopation (a genuine
+ * change of gap) and per-phrase tempo changes are excluded because their IOI
+ * ratio exceeds the threshold, so they do not masquerade as jitter.
+ */
+function offGridDeviation(notes: SimpleNote[]): number {
+  const times = notes.map((n) => n.time).sort((a, b) => a - b);
+  const iois: number[] = [];
+  for (let i = 1; i < times.length; i++) {
+    const d = times[i] - times[i - 1];
+    if (d > 1e-6) iois.push(d);
+  }
+  const devs: number[] = [];
+  for (let i = 1; i < iois.length; i++) {
+    const a = iois[i - 1];
+    const b = iois[i];
+    const ratio = a > b ? a / b : b / a;
+    if (ratio <= 1.15) devs.push(Math.abs(b - a) / ((a + b) / 2));
+  }
+  return devs.length ? devs.reduce((x, y) => x + y, 0) / devs.length : 0;
+}
+
 export interface TrackMetrics {
   noteCount: number;
   uniquePitches: number;
@@ -125,6 +167,8 @@ export interface TrackMetrics {
   velocityStd: number;
   ioiEntropyBits: number;         // inter-onset-interval variety
   adjacentWindowSimilarity: number;
+  gateLengthStd: number;          // note-length variety (duration / IOI spread)
+  offGridDeviation: number;       // microtiming: onset deviation from local grid
   inScaleRate: number;            // guardrail: must stay ~1.0
 }
 
@@ -143,6 +187,8 @@ function emptyTrackMetrics(): TrackMetrics {
     velocityStd: 0,
     ioiEntropyBits: 0,
     adjacentWindowSimilarity: 1,
+    gateLengthStd: 0,
+    offGridDeviation: 0,
     inScaleRate: 1,
   };
 }
@@ -206,6 +252,8 @@ function trackMetrics(
     velocityStd: std(notes.map((n) => n.velocity)),
     ioiEntropyBits: entropyBits(tally(iois)),
     adjacentWindowSimilarity: adjacentWindowSimilarity(notes, spanSec),
+    gateLengthStd: gateLengthStd(notes),
+    offGridDeviation: offGridDeviation(notes),
     inScaleRate: notes.length ? inScale / notes.length : 1,
   };
 }
@@ -224,12 +272,13 @@ export interface PercMetrics {
   velocityStd: number;
   ioiEntropyBits: number;
   restRatio: number;
+  offGridDeviation: number;       // microtiming / swing on the drum grid
 }
 
 export function percussionMetrics(midi: Midi, spanSec: number): PercMetrics {
   const track = midi.tracks.find((t) => t.channel === 9);
   if (!track) {
-    return { noteCount: 0, uniqueInstruments: 0, velocityStd: 0, ioiEntropyBits: 0, restRatio: 1 };
+    return { noteCount: 0, uniqueInstruments: 0, velocityStd: 0, ioiEntropyBits: 0, restRatio: 1, offGridDeviation: 0 };
   }
   const notes: SimpleNote[] = track.notes.map((n) => ({
     midi: n.midi,
@@ -248,5 +297,6 @@ export function percussionMetrics(midi: Midi, spanSec: number): PercMetrics {
     velocityStd: std(notes.map((n) => n.velocity)),
     ioiEntropyBits: entropyBits(tally(iois)),
     restRatio: restRatio(notes, spanSec),
+    offGridDeviation: offGridDeviation(notes),
   };
 }

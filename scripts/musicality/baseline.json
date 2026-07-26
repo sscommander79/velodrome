@@ -35,6 +35,8 @@
         "velocityStd": 0.123,
         "ioiEntropyBits": 5.647,
         "adjacentWindowSimilarity": 0.538,
+        "gateLengthStd": 0.063,
+        "offGridDeviation": 0.003,
         "inScaleRate": 1
       },
       "percussion": {
@@ -42,7 +44,8 @@
         "uniqueInstruments": 4,
         "velocityStd": 0.123,
         "ioiEntropyBits": 4.901,
-        "restRatio": 0.734
+        "restRatio": 0.734,
+        "offGridDeviation": 0.002
       },
       "harmony": {
         "noteCount": 15520,
@@ -58,6 +61,8 @@
         "velocityStd": 0.116,
         "ioiEntropyBits": 5.402,
         "adjacentWindowSimilarity": 0.492,
+        "gateLengthStd": 0.002,
+        "offGridDeviation": 0.003,
         "inScaleRate": 1,
         "climbPhrases": 32,
         "descendPhrases": 46,
@@ -104,6 +109,8 @@
         "velocityStd": 0.15,
         "ioiEntropyBits": 4.377,
         "adjacentWindowSimilarity": 0.393,
+        "gateLengthStd": 0.099,
+        "offGridDeviation": 0.006,
         "inScaleRate": 1
       },
       "percussion": {
@@ -111,7 +118,8 @@
         "uniqueInstruments": 4,
         "velocityStd": 0.127,
         "ioiEntropyBits": 4.146,
-        "restRatio": 0.709
+        "restRatio": 0.709,
+        "offGridDeviation": 0.003
       },
       "harmony": {
         "noteCount": 512,
@@ -127,6 +135,8 @@
         "velocityStd": 0.113,
         "ioiEntropyBits": 3.944,
         "adjacentWindowSimilarity": 0.418,
+        "gateLengthStd": 0.002,
+        "offGridDeviation": 0.002,
         "inScaleRate": 1,
         "climbPhrases": 5,
         "descendPhrases": 8,
@@ -175,6 +185,8 @@
         "velocityStd": 0.112,
         "ioiEntropyBits": 5.814,
         "adjacentWindowSimilarity": 0.447,
+        "gateLengthStd": 0.054,
+        "offGridDeviation": 0.003,
         "inScaleRate": 1
       },
       "percussion": {
@@ -182,7 +194,8 @@
         "uniqueInstruments": 4,
         "velocityStd": 0.128,
         "ioiEntropyBits": 4.965,
-        "restRatio": 0.758
+        "restRatio": 0.758,
+        "offGridDeviation": 0.002
       },
       "harmony": {
         "noteCount": 24000,
@@ -198,6 +211,8 @@
         "velocityStd": 0.105,
         "ioiEntropyBits": 5.451,
         "adjacentWindowSimilarity": 0.59,
+        "gateLengthStd": 0.001,
+        "offGridDeviation": 0.002,
         "inScaleRate": 1,
         "climbPhrases": 6,
         "descendPhrases": 74,
@@ -244,6 +259,8 @@
         "velocityStd": 0.102,
         "ioiEntropyBits": 4.443,
         "adjacentWindowSimilarity": 0.462,
+        "gateLengthStd": 0.105,
+        "offGridDeviation": 0.003,
         "inScaleRate": 1
       },
       "percussion": {
@@ -251,7 +268,8 @@
         "uniqueInstruments": 4,
         "velocityStd": 0.121,
         "ioiEntropyBits": 3.824,
-        "restRatio": 0.756
+        "restRatio": 0.756,
+        "offGridDeviation": 0.002
       },
       "harmony": {
         "noteCount": 512,
@@ -267,6 +285,8 @@
         "velocityStd": 0.075,
         "ioiEntropyBits": 3.646,
         "adjacentWindowSimilarity": 0.589,
+        "gateLengthStd": 0.001,
+        "offGridDeviation": 0.002,
         "inScaleRate": 1,
         "climbPhrases": 2,
         "descendPhrases": 13,
@@ -315,6 +335,8 @@
         "velocityStd": 0.104,
         "ioiEntropyBits": 4.602,
         "adjacentWindowSimilarity": 0.649,
+        "gateLengthStd": 0.022,
+        "offGridDeviation": 0.003,
         "inScaleRate": 1
       },
       "percussion": {
@@ -322,7 +344,8 @@
         "uniqueInstruments": 4,
         "velocityStd": 0.121,
         "ioiEntropyBits": 4.398,
-        "restRatio": 0.666
+        "restRatio": 0.666,
+        "offGridDeviation": 0.002
       },
       "harmony": {
         "noteCount": 59616,
@@ -338,6 +361,8 @@
         "velocityStd": 0.097,
         "ioiEntropyBits": 4.588,
         "adjacentWindowSimilarity": 0.577,
+        "gateLengthStd": 0.002,
+        "offGridDeviation": 0.003,
         "inScaleRate": 1,
         "climbPhrases": 41,
         "descendPhrases": 84,
@@ -384,6 +409,8 @@
         "velocityStd": 0.131,
         "ioiEntropyBits": 3.769,
         "adjacentWindowSimilarity": 0.336,
+        "gateLengthStd": 0.086,
+        "offGridDeviation": 0.003,
         "inScaleRate": 1
       },
       "percussion": {
@@ -391,7 +418,8 @@
         "uniqueInstruments": 4,
         "velocityStd": 0.119,
         "ioiEntropyBits": 3.794,
-        "restRatio": 0.695
+        "restRatio": 0.695,
+        "offGridDeviation": 0.002
       },
       "harmony": {
         "noteCount": 512,
@@ -407,6 +435,8 @@
         "velocityStd": 0.084,
         "ioiEntropyBits": 3.724,
         "adjacentWindowSimilarity": 0.346,
+        "gateLengthStd": 0.002,
+        "offGridDeviation": 0.003,
         "inScaleRate": 1,
         "climbPhrases": 6,
         "descendPhrases": 7,

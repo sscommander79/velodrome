@@ -32,6 +32,7 @@ const CONFIG: MidiConfig = {
   tempoMax: 160,
   rhythmicSensitivity: 0.5,
   targetBars: 64,
+  stepsPerBar: 16,
 };
 
 function round(obj: Record<string, number>): Record<string, number> {
