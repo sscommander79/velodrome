@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NormalizedRide, MidiConfig } from "@/lib/types";
-import { requestMidiAccess, getOutputDevices, MidiDevice, isBrowserSupported } from "@/lib/midi/webmidi";
+import { requestMidiAccess, getOutputDevices, findPairedInput, MidiDevice, isBrowserSupported } from "@/lib/midi/webmidi";
 import { segmentRide, StepData } from "@/lib/midi/segmenter";
-import { sendPatternSysEx, playStepsRealtime, PlaybackHandle } from "@/lib/midi/digitakt";
+import { sendPatternSysEx, playStepsRealtime, preflightVerify, PlaybackHandle } from "@/lib/midi/digitakt";
 
 const STEP_OPTIONS = [16, 32, 48, 64, 128] as const;
 type StepCount = typeof STEP_OPTIONS[number];
@@ -36,6 +36,10 @@ export function DigitaktPanel({ ride, config }: DigitaktPanelProps) {
   const [steps, setSteps] = useState<StepData[]>([]);
   const [playHandle, setPlayHandle] = useState<PlaybackHandle | null>(null);
   const [showSetup, setShowSetup] = useState(false);
+  // Set when a SysEx pre-flight could not confirm an Elektron device. The next
+  // click on Write proceeds anyway (explicit user override), so a destructive
+  // write never happens silently on an unverified device.
+  const [sysexOverride, setSysexOverride] = useState(false);
 
   const browserOk = isBrowserSupported();
 
@@ -73,12 +77,64 @@ export function DigitaktPanel({ ride, config }: DigitaktPanelProps) {
   const handleSend = async () => {
     if (!selectedOutput) return;
     if (mode === "sysex") {
+      // ── Pre-flight verification ──────────────────────────────────────────
+      // Confirm the target is really an Elektron device before a destructive
+      // write. A bad write to the wrong device can corrupt a project slot or
+      // wedge the port. Skipped only when the user has explicitly overridden
+      // an unverifiable/unanswered device on a prior click.
+      if (!sysexOverride && midiAccess) {
+        setStatus("sending");
+        setStatusMsg("Verifying device (Identity Request)…");
+        const input = findPairedInput(midiAccess, selectedOutput);
+        try {
+          const pre = await preflightVerify(selectedOutput, input, 500);
+          if (pre === null) {
+            setStatus("error");
+            setStatusMsg(
+              "Couldn't verify the device — no MIDI input port found to read its Identity Reply. " +
+              "Confirm this is your Digitakt 2, then click Write again to send anyway.",
+            );
+            setSysexOverride(true);
+            return;
+          }
+          if (!pre.ok && pre.reason === "no-reply") {
+            setStatus("error");
+            setStatusMsg(
+              "No Identity Reply from the device. It may not be an Elektron, may be busy, or " +
+              "SysEx receive may be off. Verify it's your DT2, then click Write again to override.",
+            );
+            setSysexOverride(true);
+            return;
+          }
+          if (!pre.ok && pre.reason === "not-elektron") {
+            const mfr = pre.identity?.manufacturer.map(b => "0x" + b.toString(16).padStart(2, "0")).join(" ");
+            setStatus("error");
+            setStatusMsg(
+              `The connected device is NOT an Elektron (manufacturer ${mfr}). Refusing to write ` +
+              `SysEx — this could corrupt an unrelated device. Select the correct output.`,
+            );
+            // No override for a positively-wrong device: force reselection.
+            return;
+          }
+        } catch (e) {
+          setStatus("error");
+          setStatusMsg(`Verification failed: ${e}. Click Write again to send anyway.`);
+          setSysexOverride(true);
+          return;
+        }
+      }
+
       setStatus("sending");
-      setStatusMsg("Sending SysEx pattern to Digitakt 2…");
+      setStatusMsg(
+        sysexOverride
+          ? "Sending SysEx pattern (unverified device, user override)…"
+          : "Device verified as Elektron. Sending SysEx pattern to Digitakt 2…",
+      );
       try {
         await sendPatternSysEx(selectedOutput, deviceId, track - 1, steps);
         setStatus("done");
         setStatusMsg(`Pattern sent to track ${track}. Check the DT2 pattern slot.`);
+        setSysexOverride(false);
       } catch (e) {
         setStatus("error");
         setStatusMsg(`SysEx error: ${e}`);

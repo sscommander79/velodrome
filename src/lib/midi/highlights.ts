@@ -108,16 +108,17 @@ export function selectHighlights(points: NormalizedPoint[], numPhrases: number):
       0.15 * normalized(components.hrDelta, maxes.hrDelta),
   }));
 
+  // Always anchor the ride's opening and closing windows so the piece has a
+  // recognizable beginning and end; everything between is filled by the
+  // MOST interesting interior windows (highest score = biggest gradient
+  // shifts, speed variance, HR swings). Previously this seeded the LOWEST
+  // interior first, which forced the dullest segment into a "highlights"
+  // reel — the opposite of the intent.
   const selected = new Map<number, ScoredCandidate>();
   selected.set(0, candidates[0]);
   if (numPhrases >= 2) selected.set(numCandidates - 1, candidates[numCandidates - 1]);
 
   const interiors = candidates.slice(1, -1);
-  if (numPhrases >= 3 && interiors.length > 0) {
-    const lowestInterior = [...interiors].sort((a, b) => a.score - b.score || a.index - b.index)[0];
-    selected.set(lowestInterior.index, lowestInterior);
-  }
-
   const topInteriors = [...interiors].sort((a, b) => b.score - a.score || a.index - b.index);
   for (const candidate of topInteriors) {
     if (selected.size >= numPhrases) break;

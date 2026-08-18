@@ -1,11 +1,20 @@
 import { MusicalKey, MusicalMode } from '../types';
 
-const KEY_ROOT_MIDI: Record<MusicalKey, number> = {
+// Single source of truth for key/scale definitions. Both the phrase converter
+// (converter.ts) and the Digitakt step segmenter (segmenter.ts) import from
+// here — keeping two copies in sync was a latent regression hazard.
+export const KEY_ROOT_MIDI: Record<MusicalKey, number> = {
   C: 60, Db: 61, D: 62, Eb: 63, E: 64, F: 65,
   'F#': 66, G: 67, Ab: 68, A: 69, Bb: 70, B: 71,
 };
 
-const SCALE_INTERVALS: Record<MusicalMode, number[]> = {
+// Pitch-class offset from C (0-11) for each key root.
+export const KEY_OFFSETS: Record<MusicalKey, number> = {
+  C: 0, Db: 1, D: 2, Eb: 3, E: 4, F: 5,
+  'F#': 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11,
+};
+
+export const SCALE_INTERVALS: Record<MusicalMode, number[]> = {
   major: [0, 2, 4, 5, 7, 9, 11],
   minor: [0, 2, 3, 5, 7, 8, 10],
   pentatonic: [0, 2, 4, 7, 9],

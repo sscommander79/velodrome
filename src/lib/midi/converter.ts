@@ -95,9 +95,43 @@ export async function convertToMidi(
 
   const SENSITIVITY = Math.max(0.1, Math.min(1, config.rhythmicSensitivity));
 
+  // ── Ride-level structure → song-level structure ─────────────────────────────
+  // The old output mapped only *instantaneous* values to *local* events, which
+  // gave texture but no narrative — every phrase had the same density, register
+  // and energy. We now pre-scan the ride into per-phrase "intensity" (a blend of
+  // effort and terrain drama) so the piece can build and release like a track.
+  //
+  // intensityOf(start,end) ∈ [0,1] combines HR effort, power, speed and the
+  // absolute elevation change across the window. It is normalized against the
+  // ride's own peak so a flat spin and an alpine climb both use the full range.
+  const rideHrRange = Math.max(1, maxHr - minHr);
+  const intensityRaw = (start: number, end: number): number => {
+    const hrN = clamp((averageOf(heartRates, start, end) - minHr) / rideHrRange, 0, 1);
+    const pwrN = clamp(averageOf(powers, start, end) / maxPower, 0, 1);
+    const spdN = clamp(averageOf(speeds, start, end) / 15, 0, 1); // ~54km/h ceiling
+    const climbN = clamp(Math.abs(altitudes[clamp(end - 1, 0, altitudes.length - 1)] - altitudes[start]) / 25, 0, 1);
+    return clamp(0.4 * hrN + 0.25 * pwrN + 0.15 * spdN + 0.2 * climbN, 0, 1);
+  };
+
+  // Song-position envelope: even a monotone-effort ride should have an arc, so
+  // we shape a gentle intro→build→peak→outro curve over the whole piece and
+  // multiply it into the data-driven intensity. progress ∈ [0,1].
+  const arcEnvelope = (progress: number): number => {
+    // Rises to ~1 around 70% through, eases in at the start and out at the end.
+    const build = Math.sin(Math.PI * Math.min(1, progress / 0.7)) * 0.5 + 0.5;
+    const outro = progress > 0.85 ? 1 - (progress - 0.85) / 0.15 * 0.5 : 1;
+    return clamp(build * outro, 0.15, 1);
+  };
+
   // Emit one 4-bar phrase for the point slice [start, end) at the given BPM.
   // Shared by both drivers below so the note/rhythm logic exists exactly once.
-  const emitPhrase = (start: number, end: number, bpm: number, phraseIndex: number): void => {
+  const emitPhrase = (
+    start: number,
+    end: number,
+    bpm: number,
+    phraseIndex: number,
+    progress: number,
+  ): void => {
     minBpmSeen = Math.min(minBpmSeen, bpm);
     maxBpmSeen = Math.max(maxBpmSeen, bpm);
 
@@ -107,6 +141,17 @@ export async function convertToMidi(
     const avgCadence = averageOf(cadences, start, end);
     const avgHr = averageOf(heartRates, start, end);
     const avgPower = averageOf(powers, start, end);
+
+    // Combined phrase intensity: ride data × global arc. Drives density,
+    // melodic register width, and drop-outs below.
+    const dataIntensity = intensityRaw(start, end);
+    const arc = arcEnvelope(progress);
+    const intensity = clamp(dataIntensity * 0.7 + arc * 0.3, 0, 1);
+
+    // Periodic "breakdown": every 8th phrase (but never the first) drops the
+    // melodic density hard and mutes percussion for contrast. Silence is the
+    // cheapest drama and the old output had none.
+    const isBreakdown = phraseIndex > 0 && (phraseIndex + 1) % 8 === 0;
 
     const smoothedCadence = Math.max(
       30,
@@ -131,12 +176,28 @@ export async function convertToMidi(
     firstOnsetInHalf[1] = pattern.findIndex((onset, step) => onset && step >= halfStep);
     const onsets: Array<{ bar: number; step: number; time: number; subStart: number }> = [];
 
+    // Density envelope: at low intensity keep only the strongest onsets
+    // (downbeats and half-bar accents), filling in the finer subdivisions as
+    // intensity rises. During a breakdown, keep only downbeats. This makes
+    // sparse quiet passages and dense climaxes instead of a constant wall.
+    const densityFloor = isBreakdown ? 0.0 : clamp(0.25 + intensity * 0.75, 0.25, 1);
+    const keepOnset = (step: number, ordinal: number): boolean => {
+      if (step === 0) return true;                       // always keep downbeat
+      if (isBreakdown) return step === halfStep;          // breakdown: 2 hits max
+      if (step === firstOnsetInHalf[0] || step === firstOnsetInHalf[1]) return true;
+      // Deterministically thin the remaining onsets toward the density floor.
+      const phase = (ordinal * 0.6180339887) % 1; // golden-ratio dither, stable
+      return phase < densityFloor;
+    };
+
+    let onsetOrdinal = 0;
     for (let bar = 0; bar < barsInPhrase; bar++) {
       const barStartTime = currentTimeSec + bar * barDurationSec;
       for (let step = 0; step < S; step++) {
         const noteTime = barStartTime + step * stepDurationSec;
         if (noteTime >= phraseEndTimeSec - 1e-9) break;
         if (!pattern[step]) continue;
+        if (!keepOnset(step, onsetOrdinal++)) continue;
         const pos = (bar * S + step) / (barsInPhrase * S);
         const subStart = start + Math.floor(pos * pointSpan);
         onsets.push({ bar, step, time: noteTime, subStart });
@@ -144,6 +205,9 @@ export async function convertToMidi(
     }
 
     let previousPitch: number | null = null;
+    let previousEmittedTime = currentTimeSec - 1e-4;
+    let melodicPitchSum = 0;
+    let melodicPitchN = 0;
     let repeatCycleIndex = 0;
     const neighborCycle = [0, -1, 0, 1];
     const MAX_LEAP = 7;
@@ -187,6 +251,14 @@ export async function convertToMidi(
         const arc = Math.round(ARC_DEPTH * Math.sin(Math.PI * arcPos));
         pitchIndex = clamp(pitchIndex + arc, 0, scaleNotes.length - 1);
       }
+      // Register width envelope (applied BEFORE the repeat-breaker so it can't
+      // re-introduce consecutive repeats): compress toward the scale centre when
+      // intensity is low, open to the full range at the peak. Leap onsets exempt.
+      if (!isLeapOnset) {
+        const center = (scaleNotes.length - 1) / 2;
+        const widthFactor = clamp(0.7 + intensity * 0.3, 0.7, 1);
+        pitchIndex = clamp(Math.round(center + (pitchIndex - center) * widthFactor), 0, scaleNotes.length - 1);
+      }
       let pitch = scaleNotes[pitchIndex];
 
       if (!isLeapOnset && previousPitch !== null && pitch === previousPitch) {
@@ -212,19 +284,34 @@ export async function convertToMidi(
       } else if (onset.step === firstOnsetInHalf[0] || onset.step === firstOnsetInHalf[1]) {
         accent = 0.06;
       }
-      const velocity = clamp(heartRateToVelocity(avgSubHr, minHr, maxHr) + accent, 0.05, 1);
+      // Dynamics follow the arc: scale HR-velocity by phrase intensity so the
+      // whole track crescendos toward the peak and eases off in the outro,
+      // instead of sitting at one flat level.
+      const dynScale = 0.55 + intensity * 0.45;
+      const velocity = clamp(heartRateToVelocity(avgSubHr, minHr, maxHr) * dynScale + accent, 0.05, 1);
       const powerRatio = avgPower > 0 ? avgSubPower / avgPower : 1;
-      const articulation = powerRatio > 1.25 ? 0.45 : powerRatio < 0.75 ? 0.95 : 0.8;
+      const articulation = clamp(1.25 - dramaNorm * 2 + (powerRatio - 1) * 0.15, 0.05, 0.98);
+      const MAX_OFFSET = 0.12 * stepDurationSec;
+      const seed = Math.sin((i + 1) * 12.9898 + onset.step * 78.233) * 43758.5453;
+      const humanize = ((seed - Math.floor(seed)) - 0.5) * 2 * MAX_OFFSET;
+      const humanizedTime = Math.max(onset.time + humanize, previousEmittedTime + 1e-4, currentTimeSec);
 
       melodicTrack.addNote({
         midi: pitch,
-        time: onset.time,
-        duration: Math.min(stepDurationSec * articulation, phraseEndTimeSec - onset.time),
+        time: humanizedTime,
+        duration: Math.min(stepDurationSec * articulation, phraseEndTimeSec - humanizedTime),
         velocity,
       });
       noteCount++;
       previousPitch = pitch;
+      previousEmittedTime = humanizedTime;
+      melodicPitchSum += pitch;
+      melodicPitchN++;
     }
+
+    // Average register of this phrase's melody, so harmony can voice away from
+    // it (counterpoint) rather than colliding in the same octave.
+    const melodicRegisterCenter = melodicPitchN > 0 ? melodicPitchSum / melodicPitchN : 60;
 
     addHarmonyPhrase(
       harmonyTrack,
@@ -240,7 +327,11 @@ export async function convertToMidi(
       maxHr,
       minAlt,
       maxAlt,
-      scaleNotes
+      scaleNotes,
+      intensity,
+      isBreakdown,
+      phraseIndex,
+      melodicRegisterCenter
     );
 
     addPercussionPhrase(
@@ -254,7 +345,11 @@ export async function convertToMidi(
       minHr,
       maxHr,
       S,
-      phraseIndex
+      phraseIndex,
+      intensity,
+      isBreakdown,
+      avgPower,
+      maxPower
     );
 
     currentTimeSec += phraseDurationSec;
@@ -273,7 +368,8 @@ export async function convertToMidi(
       }
       const { start, end } = windows[phrase];
       const bpm = speedToBpm(averageOf(speeds, start, end), config.tempoMin, config.tempoMax);
-      emitPhrase(start, end, bpm, phrase);
+      const progress = numPhrases > 1 ? phrase / (numPhrases - 1) : 0;
+      emitPhrase(start, end, bpm, phrase, progress);
     }
   } else {
     // Full ride 1:1: each phrase consumes as many points as fit in 4 bars
@@ -300,7 +396,8 @@ export async function convertToMidi(
       const pointsInPhrase = Math.max(1, Math.round(phraseDurationSec / secondsPerPoint));
       const phraseEnd = Math.min(i + pointsInPhrase, points.length);
 
-      emitPhrase(i, phraseEnd, bpm, phraseIndex);
+      const progress = points.length > 1 ? i / (points.length - 1) : 0;
+      emitPhrase(i, phraseEnd, bpm, phraseIndex, progress);
       i = phraseEnd;
     }
   }
@@ -329,8 +426,19 @@ function addPercussionPhrase(
   minHr: number,
   maxHr: number,
   stepsPerBar: number,
-  phraseIndex: number
+  phraseIndex: number,
+  intensity: number,
+  isBreakdown: boolean,
+  avgPower: number,
+  maxPowerVal: number
 ): void {
+  // Breakdown: mute the kit entirely (or leave a single downbeat kick) so the
+  // drop-out actually drops out. This is the main source of contrast.
+  if (isBreakdown) {
+    track.addNote({ midi: PERC_KICK, time: startTime, duration: 0.1, velocity: 0.5 });
+    return;
+  }
+
   const beatDuration = 60 / bpm;
   const barDuration = beatDuration * BEATS_PER_BAR;
   const stepDuration = barDuration / stepsPerBar;
@@ -340,24 +448,46 @@ function addPercussionPhrase(
   const kickPattern = euclideanPattern(kickPulses, stepsPerBar, 0);
   const hrRange = maxHr - minHr;
   const hrNorm = hrRange > 0 ? clamp((avgHr - minHr) / hrRange, 0, 1) : 0;
+
+  // ── Feel from cadence ────────────────────────────────────────────────────────
+  // Low cadence → half-time (snare on beat 3 only, sparse hats); high cadence →
+  // driving double-time (16th hats, backbeat on 2 & 4). This changes the groove
+  // itself, not just which hi-hat sample plays.
+  const feel: 'half' | 'normal' | 'double' =
+    cadenceRpm < 70 ? 'half' : cadenceRpm > 100 ? 'double' : 'normal';
   const baseHatNote = cadenceRpm > 80 ? PERC_HIHAT_CLOSED : PERC_HIHAT_OPEN;
   const fillPhrase = (phraseIndex + 1) % 4 === 0;
   const fillVelocities = [0.4, 0.5, 0.65, 0.8];
   const quarterStep = Math.round(stepsPerBar / 4);
   const threeQuarterStep = Math.round((3 * stepsPerBar) / 4);
   const ghostStep = Math.floor(stepsPerBar - 1);
-  const hatEvery = Math.max(1, Math.round(stepsPerBar / 8));
+  // Hat resolution follows feel + intensity: sparser when calm, 16ths when hot.
+  const hatDivisor = feel === 'double' ? 16 : feel === 'half' ? 4 : intensity > 0.6 ? 12 : 8;
+  const hatEvery = Math.max(1, Math.round(stepsPerBar / hatDivisor));
   const lastHatStep = Math.floor(stepsPerBar - hatEvery);
+
+  // ── Power-spike accents ──────────────────────────────────────────────────────
+  // A hard effort within this phrase (relative to the ride's own max) throws an
+  // open-hat/crash accent on the downbeat — a physical surge becomes an audible
+  // one.
+  const powerSpike = maxPowerVal > 0 && avgPower / maxPowerVal > 0.75;
 
   for (let bar = 0; bar < barsInPhrase; bar++) {
     const barStartTime = startTime + bar * barDuration;
     const isFillBar = fillPhrase && bar === barsInPhrase - 1;
 
+    if (powerSpike) {
+      // Crash-style open hat on each bar's downbeat during a surge.
+      track.addNote({ midi: PERC_HIHAT_OPEN, time: barStartTime, duration: 0.18, velocity: 0.7 });
+    }
+
     for (let step = 0; step < stepsPerBar; step++) {
       const noteTime = barStartTime + step * stepDuration;
       if (noteTime >= phraseEndTime - 1e-9) break;
 
-      if (kickPattern[step]) {
+      // Half-time drops every other kick for a slower, heavier feel.
+      const kickHere = feel === 'half' ? kickPattern[step] && step % (quarterStep * 2) === 0 : kickPattern[step];
+      if (kickHere) {
         track.addNote({
           midi: PERC_KICK,
           time: noteTime,
@@ -366,7 +496,12 @@ function addPercussionPhrase(
         });
       }
 
-      if (isFillBar && step >= threeQuarterStep) {
+      // Half-time backbeat lands on beat 3 only; others keep the 2 & 4 grid.
+      if (feel === 'half') {
+        if (step === threeQuarterStep) {
+          track.addNote({ midi: PERC_SNARE, time: noteTime, duration: 0.08, velocity: 0.55 });
+        }
+      } else if (isFillBar && step >= threeQuarterStep) {
         const fillVelocityIndex = clamp(
           Math.floor(((step - threeQuarterStep) / quarterStep) * fillVelocities.length),
           0,
@@ -408,6 +543,11 @@ function addPercussionPhrase(
   }
 }
 
+// Diatonic scale-degree progression (root offsets, in scale steps) cycled by
+// phrase so the harmony actually *moves* instead of recolouring one static
+// chord. Chosen to work in both major and minor: i/vi/III/VII-ish motion.
+const HARMONY_PROGRESSION = [0, 5, 3, 4];
+
 function addHarmonyPhrase(
   track: ReturnType<Midi['addTrack']>,
   startTime: number,
@@ -422,7 +562,11 @@ function addHarmonyPhrase(
   maxHr: number,
   minAlt: number,
   maxAlt: number,
-  scaleNotes: number[]
+  scaleNotes: number[],
+  intensity: number,
+  isBreakdown: boolean,
+  phraseIndex: number,
+  melodicRegisterCenter: number
 ): void {
   if (scaleNotes.length === 0 || end <= start) return;
 
@@ -431,44 +575,104 @@ function addHarmonyPhrase(
   const basePitch = elevationToPitch(avgAlt, minAlt, maxAlt, scaleNotes);
   const baseIndex = Math.max(0, scaleNotes.indexOf(basePitch));
   const gradient = altitudes[Math.max(start, end - 1)] - altitudes[start];
+
+  // Harmonic movement: shift the chord root by the phrase's step in the
+  // progression, on top of the elevation-derived base. Gives a sense of chord
+  // changes across a section rather than one drone recoloured by gradient.
+  const progressionStep = HARMONY_PROGRESSION[phraseIndex % HARMONY_PROGRESSION.length];
   const maxChordOffset = gradient > 3 ? 6 : 4;
-  const rootIndex = clamp(
-    baseIndex - degreesPerOctave,
+  let rootIndex = clamp(
+    baseIndex - degreesPerOctave + progressionStep,
     0,
     Math.max(0, scaleNotes.length - 1 - maxChordOffset)
   );
+
   const chordIndices =
     gradient > 3
-      ? [rootIndex, rootIndex + 2, rootIndex + 4, rootIndex + 6]
+      ? [rootIndex, rootIndex + 2, rootIndex + 4, rootIndex + 6] // climbing: lush 7th
       : gradient < -3
-        ? [rootIndex, rootIndex + 2, rootIndex + 4]
-        : [rootIndex, rootIndex + 3, rootIndex + 4];
-  const chordNotes = chordIndices.map((index) => scaleNotes[index]);
+        ? [rootIndex, rootIndex + 2, rootIndex + 4]              // descending: open triad
+        : [rootIndex, rootIndex + 3, rootIndex + 4];             // rolling: sus-ish colour
+  let chordNotes = chordIndices.map((index) => scaleNotes[clamp(index, 0, scaleNotes.length - 1)]);
 
-  const mid = start + Math.floor((end - start) / 2);
-  const firstHalfSpeed = averageOf(speeds, start, Math.max(start + 1, mid));
-  const secondHalfSpeed = averageOf(speeds, mid, end);
-  const speedRatio = firstHalfSpeed > 0 ? secondHalfSpeed / firstHalfSpeed : 1;
-  const direction = speedRatio > 1.05 ? 'up' : speedRatio < 0.95 ? 'down' : 'pingpong';
+  // ── Voice away from the melody (counterpoint) ────────────────────────────────
+  // If the chord sits in the same octave as the melody's current register they
+  // fight; drop the whole voicing an octave when the melody is high, raise it
+  // when the melody is low. Keeps harmony and melody in separate registers.
+  const chordCenter = chordNotes.reduce((a, b) => a + b, 0) / chordNotes.length;
+  if (chordCenter > melodicRegisterCenter - 3) {
+    chordNotes = chordNotes.map((n) => n - 12);
+  } else if (chordCenter < melodicRegisterCenter - 18) {
+    chordNotes = chordNotes.map((n) => n + 12);
+  }
+  chordNotes = chordNotes.map((n) => clamp(n, 24, 96));
 
-  const eighthDuration = beatDuration / 2;
-  const barEighths = BEATS_PER_BAR * 2;
-  const totalEighths = Math.ceil(phraseDuration / eighthDuration);
   const phraseEndTime = startTime + phraseDuration;
-  const baseVelocity = heartRateToVelocity(avgHr, minHr, maxHr) - 0.12;
+  const baseVelocity = clamp(
+    heartRateToVelocity(avgHr, minHr, maxHr) * (0.55 + intensity * 0.4) - 0.12,
+    0.05,
+    0.9,
+  );
 
-  for (let step = 0; step < totalEighths; step++) {
-    const noteTime = startTime + step * eighthDuration;
-    if (noteTime >= phraseEndTime - 1e-9) break;
+  // ── Rhythm from terrain stability ────────────────────────────────────────────
+  // Steady terrain (low gradient shift) → sustained pad chords; variable
+  // terrain → syncopated stabs. Breakdown → a single held whole-note swell.
+  const mid = start + Math.floor((end - start) / 2);
+  const firstHalfGrad = altitudes[Math.max(start, mid - 1)] - altitudes[start];
+  const secondHalfGrad = altitudes[Math.max(mid, end - 1)] - altitudes[mid];
+  const gradShift = Math.abs(secondHalfGrad - firstHalfGrad);
 
-    const chordPosition = harmonyChordPosition(step, chordNotes.length, direction);
-    const velocity = clamp(baseVelocity + (step % barEighths === 0 ? 0.08 : 0), 0.05, 0.9);
-    track.addNote({
-      midi: chordNotes[chordPosition],
-      time: noteTime,
-      duration: Math.min(eighthDuration * 0.9, phraseEndTime - noteTime),
-      velocity,
-    });
+  const emitChord = (t: number, dur: number, vel: number) => {
+    for (const midiNote of chordNotes) {
+      track.addNote({
+        midi: midiNote,
+        time: t,
+        duration: Math.min(dur, phraseEndTime - t),
+        velocity: vel,
+      });
+    }
+  };
+
+  if (isBreakdown) {
+    // One long swell — the harmonic floor under the drop-out.
+    emitChord(startTime, phraseDuration * 0.98, clamp(baseVelocity - 0.05, 0.05, 0.7));
+    return;
+  }
+
+  const barDuration = beatDuration * BEATS_PER_BAR;
+  const bars = Math.max(1, Math.round(phraseDuration / barDuration));
+
+  if (gradShift < 4) {
+    // Sustained pad: one chord per bar, gently accented on bar 1.
+    for (let bar = 0; bar < bars; bar++) {
+      const t = startTime + bar * barDuration;
+      if (t >= phraseEndTime - 1e-9) break;
+      emitChord(t, barDuration * 0.95, clamp(baseVelocity + (bar === 0 ? 0.06 : 0), 0.05, 0.9));
+    }
+  } else {
+    // Syncopated stabs: hits on beats 1 and the "and" of 2/3, arpeggiated so
+    // the voicing shimmers instead of blocking. Density rises with intensity.
+    const eighth = beatDuration / 2;
+    const totalEighths = Math.ceil(phraseDuration / eighth);
+    const direction =
+      secondHalfGrad > firstHalfGrad ? 'up' : secondHalfGrad < firstHalfGrad ? 'down' : 'pingpong';
+    const stabPositions = new Set(
+      intensity > 0.6 ? [0, 3, 4, 7, 8, 11] : [0, 3, 8, 11],
+    );
+    for (let step = 0; step < totalEighths; step++) {
+      const inBar = step % (BEATS_PER_BAR * 2);
+      if (!stabPositions.has(inBar)) continue;
+      const noteTime = startTime + step * eighth;
+      if (noteTime >= phraseEndTime - 1e-9) break;
+      const chordPosition = harmonyChordPosition(step, chordNotes.length, direction);
+      const vel = clamp(baseVelocity + (inBar === 0 ? 0.08 : 0), 0.05, 0.9);
+      track.addNote({
+        midi: chordNotes[chordPosition],
+        time: noteTime,
+        duration: Math.min(eighth * 1.6, phraseEndTime - noteTime),
+        velocity: vel,
+      });
+    }
   }
 }
 

@@ -86,6 +86,96 @@ export async function sendPatternSysEx(
   sendSysEx(output, Array.from(sysexBody));
 }
 
+// ─── Pre-flight safety: Universal Device Inquiry handshake ────────────────────
+// A blind pattern write to a mis-identified device (or a non-Elektron on the
+// same port) can corrupt a project slot or wedge the MIDI port on Elektron
+// hardware. Before writing, we send the STANDARD MIDI Universal Non-Realtime
+// Identity Request (F0 7E 7F 06 01 F7) and listen for an Identity Reply.
+// We verify the Elektron manufacturer ID (00 20 3C) before allowing the write.
+// This is a read-only, universally safe message understood by virtually all
+// MIDI gear, so it cannot itself harm the device.
+
+const IDENTITY_REQUEST = [0x7e, 0x7f, 0x06, 0x01]; // sendSysEx adds F0 … F7
+
+export interface DeviceIdentity {
+  isElektron: boolean;
+  manufacturer: number[];
+  familyCode: number[];
+  raw: number[];
+}
+
+/**
+ * Send an Identity Request and wait up to `timeoutMs` for a reply on the
+ * matching input. Returns the parsed identity, or null if nothing answered.
+ * The caller supplies the paired MIDIInput (same device as the output).
+ */
+export function requestDeviceIdentity(
+  output: MIDIOutput,
+  input: MIDIInput,
+  timeoutMs = 400,
+): Promise<DeviceIdentity | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result: DeviceIdentity | null) => {
+      if (settled) return;
+      settled = true;
+      input.removeEventListener("midimessage", onMessage as EventListener);
+      resolve(result);
+    };
+
+    const onMessage = (event: MIDIMessageEvent) => {
+      const data = Array.from(event.data ?? []);
+      // Identity Reply: F0 7E <ch> 06 02 <mfr…> … F7
+      if (data.length < 7 || data[0] !== 0xf0 || data[1] !== 0x7e) return;
+      if (data[3] !== 0x06 || data[4] !== 0x02) return;
+
+      // Manufacturer ID: either 1 byte (non-zero) or 3 bytes (leading 0x00).
+      let mfr: number[];
+      let familyStart: number;
+      if (data[5] === 0x00) {
+        mfr = [data[5], data[6], data[7]];
+        familyStart = 8;
+      } else {
+        mfr = [data[5]];
+        familyStart = 6;
+      }
+      const isElektron = mfr.length === 3 && mfr[0] === 0x00 && mfr[1] === 0x20 && mfr[2] === 0x3c;
+      finish({
+        isElektron,
+        manufacturer: mfr,
+        familyCode: data.slice(familyStart, familyStart + 2),
+        raw: data,
+      });
+    };
+
+    input.addEventListener("midimessage", onMessage as EventListener);
+    sendSysEx(output, IDENTITY_REQUEST);
+    setTimeout(() => finish(null), timeoutMs);
+  });
+}
+
+export type PreflightResult =
+  | { ok: true; identity: DeviceIdentity }
+  | { ok: false; reason: "no-reply" | "not-elektron"; identity: DeviceIdentity | null };
+
+/**
+ * Verify the target really is an Elektron device before a destructive SysEx
+ * write. If no paired input is available we cannot verify — the caller decides
+ * whether to proceed (we surface that as a distinct, explicit path rather than
+ * silently writing).
+ */
+export async function preflightVerify(
+  output: MIDIOutput,
+  input: MIDIInput | null,
+  timeoutMs = 400,
+): Promise<PreflightResult | null> {
+  if (!input) return null; // cannot verify; caller must decide
+  const identity = await requestDeviceIdentity(output, input, timeoutMs);
+  if (!identity) return { ok: false, reason: "no-reply", identity: null };
+  if (!identity.isElektron) return { ok: false, reason: "not-elektron", identity };
+  return { ok: true, identity };
+}
+
 // ─── Real-time playback ───────────────────────────────────────────────────────
 // Plays steps as MIDI notes in real time using Web Audio / performance.now() timing.
 // The DT2 must be in LIVE RECORDING mode to capture this to its sequencer.

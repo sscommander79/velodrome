@@ -1,5 +1,6 @@
 import { NormalizedRide, MidiConfig, MusicalKey, MusicalMode } from "@/lib/types";
 import { euclideanPattern } from "./euclidean";
+import { SCALE_INTERVALS, KEY_OFFSETS } from "./scales";
 
 export interface StepData {
   note: number;      // MIDI note 0-127
@@ -8,16 +9,20 @@ export interface StepData {
   active: boolean;   // false = rest/no trig
 }
 
-const SCALE_INTERVALS: Record<MusicalMode, number[]> = {
-  major:      [0, 2, 4, 5, 7, 9, 11],
-  minor:      [0, 2, 3, 5, 7, 8, 10],
-  pentatonic: [0, 2, 4, 7, 9],
-};
-
-const KEY_OFFSETS: Record<MusicalKey, number> = {
-  C: 0, Db: 1, D: 2, Eb: 3, E: 4, F: 5,
-  'F#': 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11,
-};
+// Loop-based min/max. Math.min(...arr) / Math.max(...arr) throw
+// "Maximum call stack size exceeded" once the spread exceeds the engine's
+// argument limit (~tens of thousands) — which a 1 Hz multi-hour ride easily
+// hits. converter.ts already avoids this; segmenter must too.
+function minOf(arr: number[]): number {
+  let m = Infinity;
+  for (let i = 0; i < arr.length; i++) if (arr[i] < m) m = arr[i];
+  return m;
+}
+function maxOf(arr: number[]): number {
+  let m = -Infinity;
+  for (let i = 0; i < arr.length; i++) if (arr[i] > m) m = arr[i];
+  return m;
+}
 
 function quantizeToScale(rawNote: number, key: MusicalKey, mode: MusicalMode): number {
   const intervals = SCALE_INTERVALS[mode];
@@ -61,20 +66,20 @@ export function segmentRide(
   const sliceSize = Math.max(1, Math.floor(points.length / stepCount));
 
   const altitudes = points.map(p => p.altitude);
-  const altMin = Math.min(...altitudes);
-  const altMax = Math.max(...altitudes);
+  const altMin = minOf(altitudes);
+  const altMax = maxOf(altitudes);
   const altRange = Math.max(1, altMax - altMin);
 
   const speeds = points.map(p => p.speed);
-  const speedMin = Math.min(...speeds);
-  const speedMax = Math.max(...speeds);
+  const speedMin = minOf(speeds);
+  const speedMax = maxOf(speeds);
   const speedRange = Math.max(1, speedMax - speedMin);
 
   const cadences = points.map(p => p.cadence);
   const powers = points.map(p => p.power);
   const rideMeanCadence = mean(cadences);
   const rideMeanPower = mean(powers);
-  const maxPower = Math.max(1, ...powers);
+  const maxPower = Math.max(1, maxOf(powers));
   const k = clamp(Math.round(3 + ((rideMeanCadence - 30) / 100) * 9), 6, 12);
   const rotation = Math.round(clamp(rideMeanPower / maxPower, 0, 1) * 3);
   const activeMask = euclideanPattern(k, 16, rotation);
