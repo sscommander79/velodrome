@@ -30,15 +30,17 @@ export function findPairedInput(access: MIDIAccess, output: MIDIOutput): MIDIInp
   access.inputs.forEach((input) => inputs.push(input));
   if (inputs.length === 0) return null;
 
-  const outName = (output.name ?? "").toLowerCase();
+  const outName = (output.name ?? "").toLowerCase().trim();
   if (outName) {
-    const exact = inputs.find((i) => (i.name ?? "").toLowerCase() === outName);
+    const exact = inputs.find((i) => (i.name ?? "").toLowerCase().trim() === outName);
     if (exact) return exact;
-    const fuzzy = inputs.find((i) => {
-      const n = (i.name ?? "").toLowerCase();
-      return n.includes(outName) || outName.includes(n);
-    });
-    if (fuzzy) return fuzzy;
+    // Fuzzy fallback: only accept an input whose name STARTS WITH the output
+    // name (e.g. output "Digitakt II" ↔ input "Digitakt II MIDI 1"). Avoid the
+    // looser bidirectional `includes`, which could wrongly pair a hardware
+    // output to an unrelated virtual port like "Digitakt II Editor".
+    const prefixed = inputs.filter((i) => (i.name ?? "").toLowerCase().trim().startsWith(outName));
+    if (prefixed.length === 1) return prefixed[0];
+    // Ambiguous prefix match → don't guess; fall through to the single-input case.
   }
   return inputs.length === 1 ? inputs[0] : null;
 }

@@ -147,6 +147,22 @@ describe('requestDeviceIdentity', () => {
     expect(identity).toBeNull();
   });
 
+  it('ignores a truncated reply with no F7 terminator', async () => {
+    vi.useFakeTimers();
+    // Valid identity-reply header but missing the closing 0xF7 → incomplete
+    // frame → must be rejected (fragmented/interleaved SysEx guard).
+    const truncated = elektronIdentityReply().slice(0, -1); // drop F7
+    const { output, input } = makePair(truncated);
+    const p = requestDeviceIdentity(
+      output as unknown as MIDIOutput,
+      input as unknown as MIDIInput,
+      400,
+    );
+    const identity = await runHandshake(input, p);
+    vi.useRealTimers();
+    expect(identity).toBeNull();
+  });
+
   it('ignores non-identity SysEx traffic and still times out', async () => {
     vi.useFakeTimers();
     const { output, input } = makePair([0xf0, 0x7e, 0x00, 0x06, 0x01, 0xf7]); // a REQUEST, not a reply (06 01)

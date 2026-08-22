@@ -127,6 +127,7 @@ export function requestDeviceIdentity(
       const data = Array.from(event.data ?? []);
       // Identity Reply: F0 7E <ch> 06 02 <mfr…> … F7
       if (data.length < 7 || data[0] !== 0xf0 || data[1] !== 0x7e) return;
+      if (data[data.length - 1] !== 0xf7) return; // must be a complete SysEx frame
       if (data[3] !== 0x06 || data[4] !== 0x02) return;
 
       // Manufacturer ID: either 1 byte (non-zero) or 3 bytes (leading 0x00).

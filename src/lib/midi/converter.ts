@@ -117,10 +117,24 @@ export async function convertToMidi(
   // we shape a gentle intro→build→peak→outro curve over the whole piece and
   // multiply it into the data-driven intensity. progress ∈ [0,1].
   const arcEnvelope = (progress: number): number => {
-    // Rises to ~1 around 70% through, eases in at the start and out at the end.
-    const build = Math.sin(Math.PI * Math.min(1, progress / 0.7)) * 0.5 + 0.5;
-    const outro = progress > 0.85 ? 1 - (progress - 0.85) / 0.15 * 0.5 : 1;
-    return clamp(build * outro, 0.15, 1);
+    // Intro → build → late peak → outro. Peaks at PEAK_AT (~72% through) so a
+    // ride whose climax is late (e.g. a summit near the end) actually lands at
+    // full energy there, then eases off for the outro. A gentle intro floor
+    // avoids starting at full tilt. (The previous sin(pi*p/0.7) form peaked at
+    // 35% and then *declined* through the back half — the opposite of intent.)
+    const PEAK_AT = 0.72;
+    const INTRO_FLOOR = 0.35;
+    let e: number;
+    if (progress <= PEAK_AT) {
+      // Ease in from INTRO_FLOOR up to 1 at the peak (half-cosine rise).
+      const t = progress / PEAK_AT;
+      e = INTRO_FLOOR + (1 - INTRO_FLOOR) * (0.5 - 0.5 * Math.cos(Math.PI * t));
+    } else {
+      // Ease down from 1 to ~0.45 across the outro (half-cosine fall).
+      const t = (progress - PEAK_AT) / (1 - PEAK_AT);
+      e = 1 - 0.55 * (0.5 - 0.5 * Math.cos(Math.PI * t));
+    }
+    return clamp(e, 0.15, 1);
   };
 
   // Emit one 4-bar phrase for the point slice [start, end) at the given BPM.
@@ -299,7 +313,13 @@ export async function convertToMidi(
       melodicTrack.addNote({
         midi: pitch,
         time: humanizedTime,
-        duration: Math.min(stepDurationSec * articulation, phraseEndTimeSec - humanizedTime),
+        // Floor the note at 20ms so the shortest staccato at fast tempos is a
+        // real audible attack, not a sub-perceptual click, while never
+        // overrunning the phrase end.
+        duration: Math.min(
+          Math.max(stepDurationSec * articulation, 0.02),
+          Math.max(0.001, phraseEndTimeSec - humanizedTime),
+        ),
         velocity,
       });
       noteCount++;
@@ -599,12 +619,20 @@ function addHarmonyPhrase(
   // If the chord sits in the same octave as the melody's current register they
   // fight; drop the whole voicing an octave when the melody is high, raise it
   // when the melody is low. Keeps harmony and melody in separate registers.
+  // Shift the whole voicing by an octave — but ONLY if the shifted chord still
+  // fits in range. A blind shift + per-note clamp could otherwise squash a
+  // low chord's notes together into a unison drone (they'd all hit the 24
+  // floor). We move the block only when it stays within [24,96] intact.
   const chordCenter = chordNotes.reduce((a, b) => a + b, 0) / chordNotes.length;
-  if (chordCenter > melodicRegisterCenter - 3) {
+  const lo = Math.min(...chordNotes);
+  const hi = Math.max(...chordNotes);
+  if (chordCenter > melodicRegisterCenter - 3 && lo - 12 >= 24) {
     chordNotes = chordNotes.map((n) => n - 12);
-  } else if (chordCenter < melodicRegisterCenter - 18) {
+  } else if (chordCenter < melodicRegisterCenter - 18 && hi + 12 <= 96) {
     chordNotes = chordNotes.map((n) => n + 12);
   }
+  // Final safety clamp (chord already verified in-range above, so this is a
+  // no-op in practice — kept as a guard against pathological scale configs).
   chordNotes = chordNotes.map((n) => clamp(n, 24, 96));
 
   const phraseEndTime = startTime + phraseDuration;
